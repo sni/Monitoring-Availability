@@ -292,18 +292,18 @@ sub _set_from_type {
 
     # program starts
     if($data->{'type'} =~ m/\ starting\.\.\./mx) {
-        $data->{'start'} = 1;
+        $data->{'proc_start'} = 1;
     }
     elsif($data->{'type'} =~ m/\ restarting\.\.\./mx) {
-        $data->{'start'} = 1;
+        $data->{'proc_start'} = 1;
     }
 
     # program stops
     elsif($data->{'type'} =~ m/shutting\ down\.\.\./mx) {
-        $data->{'start'} = 0;
+        $data->{'proc_start'} = 0;
     }
     elsif($data->{'type'} =~ m/Bailing\ out/mx) {
-        $data->{'start'} = 0;
+        $data->{'proc_start'} = 0;
     }
 
     return 1;

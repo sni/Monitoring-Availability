@@ -3,7 +3,7 @@
 #########################
 
 use strict;
-use Test::More tests => 48;
+use Test::More tests => 60;
 use Data::Dumper;
 use File::Temp qw/ tempfile tempdir /;
 
@@ -12,27 +12,33 @@ use_ok('Monitoring::Availability');
 #########################
 
 my $expected = [
+    { 'time' => '1260711580', 'type' => 'Local time is Sun Dec 13 14:39:40 CET 2009' },
+    { 'time' => '1260711580', 'type' => 'Nagios 3.0.6 starting... (PID=12480)', 'proc_start' => 1 },
+    { 'time' => '1260711581', 'type' => 'Finished daemonizing... (New PID=12484)' },
+    { 'time' => '1260715790', 'type' => 'Error' },
+    { 'time' => '1260715801', 'type' => 'Successfully shutdown... (PID=12502)' },
+    { 'time' => '1260716221', 'type' => 'Lockfile \'/opt/projects/nagios/n1/var/nagios3.pid\' looks like its already held by another instance of Nagios (PID 13226).  Bailing out...', 'proc_start' => 0 },
+    { 'time' => '1260722815', 'type' => 'Warning' },
+    { 'time' => '1260725492', 'type' => 'Warning' },
+    { 'time' => '1260725492', 'type' => 'Warning' },
+    { 'time' => '1260971246', 'type' => 'PROGRAM_RESTART event encountered, restarting...', 'proc_start' => 1 },
+    { 'time' => '1261050819', 'type' => 'PASSIVE HOST CHECK' },
+    { 'time' => '1261685289', 'type' => 'SERVICE NOTIFICATION' },
+    { 'time' => '1261686379', 'type' => 'SERVICE FLAPPING ALERT' },
+    { 'time' => '1261686484', 'type' => 'SERVICE ALERT', 'host_name' => 'i0test_host_132', 'service_description' => 'i0test_random_18', 'state' => 2, 'hard' => 1 },
+    { 'time' => '1261687372', 'type' => 'HOST ALERT', 'host_name' => 'i0test_host_198', 'state' => 1, 'hard' => 1 },
+    { 'time' => '1261687372', 'type' => 'HOST NOTIFICATION' },
+    { 'time' => '1261687373', 'type' => 'HOST FLAPPING ALERT' },
+    { 'time' => '1262850812', 'type' => 'Caught SIGSEGV, shutting down...', 'proc_start' => 0 },
+    { 'time' => '1262850822', 'type' => 'HOST DOWNTIME ALERT', 'host_name' => 'localhost', 'start' => 1 },
+    { 'time' => '1262850822', 'type' => 'SERVICE DOWNTIME ALERT', 'host_name' => 'localhost', 'service_description' => 'test', 'start' => 1 },
+    { 'time' => '1263042133', 'type' => 'EXTERNAL COMMAND' },
+    { 'time' => '1263423600', 'type' => 'CURRENT HOST STATE', 'host_name' => 'i0test_router_19', 'state' => 0, 'hard' => 1 },
+    { 'time' => '1263423600', 'type' => 'CURRENT SERVICE STATE', 'host_name' => 'i0test_host_199', 'service_description' => 'i0test_warning_18', 'state' => 1, 'hard' => 1 },
     { 'time' => '1263423600', 'type' => 'LOG ROTATION' },
-    { 'time' => '1263423600', 'type' => 'LOG VERSION' },
-    { 'time' => '1263423600', 'type' => 'CURRENT HOST STATE', 'state' => 0, 'host_name' => 'n0_test_host_001', 'hard' => 1 },
-    { 'time' => '1263423600', 'type' => 'CURRENT SERVICE STATE', 'state' => 0, 'host_name' => 'n0_test_host_000',  'service_description' => 'n0_test_random_00', 'hard' => 1 },
-    { 'time' => '1263455830', 'type' => 'Auto-save of retention data completed successfully.'  },
-    { 'time' => '1263458022', 'type' => 'Caught SIGTERM, shutting down...', 'start' => 0 },
-    { 'time' => '1263458024', 'type' => 'Successfully shutdown... (PID=10280)' },
-    { 'time' => '1263458025', 'type' => 'livestatus' },
-    { 'time' => '1263458026', 'type' => 'Event broker module \'/opt/projects/git/check_mk/livestatus/src/livestatus.o\' deinitialized successfully.' },
-    { 'time' => '1263458059', 'type' => 'Nagios 3.2.0 starting... (PID=3382)', 'start' => 1 },
-    { 'time' => '1263458059', 'type' => 'Local time is Thu Jan 14 09:34:19 CET 2010' },
-    { 'time' => '1263458059', 'type' => 'LOG VERSION' },
-    { 'time' => '1263458059', 'type' => 'livestatus' },
-    { 'time' => '1263458059', 'type' => 'Event broker module \'/opt/projects/git/check_mk/livestatus/src/livestatus.o\' initialized successfully.' },
-    { 'time' => '1263458060', 'type' => 'Finished daemonizing... (New PID=3387)' },
-    { 'time' => '1263458061', 'type' => 'SERVICE DOWNTIME ALERT', 'host_name' => 'n0_test_host_004',  'service_description' => 'n0_test_critical_18', 'start' => 1 },
-    { 'time' => '1262960576', 'type' => 'Warning' },
-    { 'time' => '1262959921', 'type' => 'SERVICE ALERT', 'state' => 3, 'host_name' => 'n0_test_host_029',  'service_description' => 'n0_test_unknown_00', 'hard' => 1 },
-    { 'time' => '1262959921', 'type' => 'SERVICE NOTIFICATION' },
-    { 'time' => '1262959926', 'type' => 'HOST ALERT', 'state' => 0, 'host_name' => 'n0_test_host_188', 'hard' => 0 },
-    { 'time' => '1262959926', 'type' => 'HOST ALERT', 'state' => 2, 'host_name' => 'n0_test_host_199', 'hard' => 0 },
+    { 'time' => '1263457861', 'type' => 'Auto-save of retention data completed successfully.' },
+    { 'time' => '1263458022', 'type' => 'Caught SIGTERM, shutting down...', 'proc_start' => 0 },
+    { 'time' => '1263648166', 'type' => 'LOG VERSION' },
 ];
 
 my $ma = Monitoring::Availability->new();
@@ -70,7 +76,7 @@ print $logfile $logs;
 close($logfile);
 
 $ma->_reset_log_store;
-my $rt = $ma->_read_logs_from_dir($dir);
+$rt = $ma->_read_logs_from_dir($dir);
 is($rt, 1, '_read_logs_from_dir rc');
 is_deeply($ma->{'logs'}, $expected, 'reading logs from dir');
 
@@ -90,24 +96,30 @@ sub fail_out {
 
 
 __DATA__
-[1263423600] LOG ROTATION: DAILY
-[1263423600] LOG VERSION: 2.0
-[1263423600] CURRENT HOST STATE: n0_test_host_001;UP;HARD;1;n0_test_host_001 (checked by mo) OK: ok hostcheck
-[1263423600] CURRENT SERVICE STATE: n0_test_host_000;n0_test_random_00;OK;HARD;1;n0_test_host_000 (checked by mo) OK: random n0_test_random_00 ok
-[1263455830] Auto-save of retention data completed successfully.
+[1260711580] Local time is Sun Dec 13 14:39:40 CET 2009: 39:40 CET 2009
+[1260711580] Nagios 3.0.6 starting... (PID=12480)
+[1260711581] Finished daemonizing... (New PID=12484)
+[1260715790] Error: Unable to create temp file for writing status data!: Unable to create temp file for writing status data!
+[1260715801] Successfully shutdown... (PID=12502)
+[1260716221] Lockfile '/opt/projects/nagios/n1/var/nagios3.pid' looks like its already held by another instance of Nagios (PID 13226).  Bailing out...
+[1260722815] Warning: The check of host 'test_host_020' looks like it was orphaned (results never came back).  I'm scheduling an immediate check of the host...: The check of host 'test_host_020' looks like it was orphaned (results never came back).  I'm scheduling an immediate check of the host...
+[1260725492] Warning: Check result queue contained results for host 'test_host_105', but the host could not be found!  Perhaps you forgot to define the host in your config files?: Check result queue contained results for host 'test_host_105', but the host could not be found!  Perhaps you forgot to define the host in your config files?
+[1260725492] Warning: Check result queue contained results for service 'test_ok_04' on host 'test_host_131', but the service could not be found!  Perhaps you forgot to define the service in your config files?: Check result queue contained results for service 'test_ok_04' on host 'test_host_131', but the service could not be found!  Perhaps you forgot to define the service in your config files?
+[1260971246] PROGRAM_RESTART event encountered, restarting...
+[1261050819] PASSIVE HOST CHECK: n1_test_router_00;0;blah blah blah
+[1261685289] SERVICE NOTIFICATION: test_contact;i0test_host_180;i0test_random_18;OK;notify-service;mo REVOVERED: random servicecheck recovered
+[1261686379] SERVICE FLAPPING ALERT: i0test_host_135;i0test_flap_01;STARTED; Service appears to have started flapping (24.2% change >= 20.0% threshold)
+[1261686484] SERVICE ALERT: i0test_host_132;i0test_random_18;CRITICAL;HARD;1;mo CRITICAL: random servicecheck critical
+[1261687372] HOST ALERT: i0test_host_198;DOWN;HARD;1;mo DOWN: random hostcheck: parent host down
+[1261687372] HOST NOTIFICATION: test_contact;i0test_host_198;DOWN;notify-host;mo DOWN: random hostcheck: parent host down
+[1261687373] HOST FLAPPING ALERT: i0test_host_198;STARTED; Host appears to have started flapping (20.3% change > 20.0% threshold)
+[1262850812] Caught SIGSEGV, shutting down...
+[1262850822] HOST DOWNTIME ALERT: localhost;STARTED; Host has entered a period of scheduled downtime
+[1262850822] SERVICE DOWNTIME ALERT: localhost;test;STARTED; Service has entered a period of scheduled downtime
+[1263042133] EXTERNAL COMMAND: ENABLE_NOTIFICATIONS;
+[1263423600] CURRENT HOST STATE: i0test_router_19;UP;HARD;1;mo OK: random hostcheck ok
+[1263423600] CURRENT SERVICE STATE: i0test_host_199;i0test_warning_18;WARNING;HARD;3;mo WARNING: warning servicecheck
+[1263423600] LOG ROTATION: DAILY: DAILY
+[1263457861] Auto-save of retention data completed successfully.
 [1263458022] Caught SIGTERM, shutting down...
-[1263458024] Successfully shutdown... (PID=10280)
-[1263458025] livestatus: Main thread + 10 client threads have finished
-[1263458026] Event broker module '/opt/projects/git/check_mk/livestatus/src/livestatus.o' deinitialized successfully.
-[1263458059] Nagios 3.2.0 starting... (PID=3382)
-[1263458059] Local time is Thu Jan 14 09:34:19 CET 2010
-[1263458059] LOG VERSION: 2.0
-[1263458059] livestatus: successfully finished initialization
-[1263458059] Event broker module '/opt/projects/git/check_mk/livestatus/src/livestatus.o' initialized successfully.
-[1263458060] Finished daemonizing... (New PID=3387)
-[1263458061] SERVICE DOWNTIME ALERT: n0_test_host_004;n0_test_critical_18;STARTED; Service has entered a period of scheduled downtime
-[1262960576] Warning: The check of host 'n0_test_host_058' looks like it was orphaned (results never came back).  I'm scheduling an immediate check of the host...
-[1262959921] SERVICE ALERT: n0_test_host_029;n0_test_unknown_00;UNKNOWN;HARD;3;n0_test_host_029 (checked by mo) UNKNOWN: unknown n0_test_unknown_00
-[1262959921] SERVICE NOTIFICATION: test_contact;n0_test_host_029;n0_test_unknown_00;UNKNOWN;notify-service;n0_test_host_029 (checked by mo) UNKNOWN: unknown n0_test_unknown_00
-[1262959926] HOST ALERT: n0_test_host_188;UP;SOFT;2;mo FLAP: flap hostcheck up
-[1262959926] HOST ALERT: n0_test_host_199;UNREACHABLE;SOFT;3;n0_test_host_199 (checked by mo) DOWN: random hostcheck: parent host state: DOWN
+[1263648166] LOG VERSION: 2.0: 2.0
