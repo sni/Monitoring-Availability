@@ -6,7 +6,7 @@ use warnings;
 use Data::Dumper;
 use Carp;
 
-our $VERSION = '0.01_1';
+our $VERSION = '0.03_1';
 
 
 =head1 NAME
@@ -149,6 +149,9 @@ Directory containing *.log files
 
 Array with logs from a livestatus query
 
+ a sample query could be:
+ selectall_arrayref(GET logs...\nColumns: time type options, {Slice => 1})
+
 =back
 
 =cut
@@ -270,12 +273,42 @@ sub _read_logs_from_dir {
 }
 
 ########################################
+sub _read_logs_from_livestatus {
+    my $self      = shift;
+    my $log_array = shift;
+    return unless defined $log_array;
+    for my $entry (@{$log_array}) {
+        my $data = $self->_parse_livestatus_entry($entry);
+        push @{$self->{'logs'}}, $data if defined $data;
+    }
+    return 1;
+}
+
+########################################
+sub _parse_livestatus_entry {
+    my $self   = shift;
+    my $entry  = shift;
+
+    my $string = $entry->{'options'} || '';
+    if($string eq '') {
+        # extract starts/stops
+        $self->_set_from_type($entry, $string);
+        return $entry;
+    }
+
+    # extract more information from our options
+    $self->_set_from_options($entry, $string);
+
+    return $entry;
+}
+
+########################################
 sub _parse_line {
     my $self   = shift;
     my $string = shift;
     my $return = {
-        'time'                => '',
-        'type'                => '',
+        'time' => '',
+        'type' => '',
     };
 
     return if substr($string, 0, 1, '') ne '[';
@@ -439,6 +472,7 @@ sub _set_empty_hosts {
             'time_indeterminate_notrunning' => 0,
         };
     }
+    return 1;
 }
 
 ########################################
@@ -471,6 +505,7 @@ sub _set_empty_services {
             };
         }
     }
+    return 1;
 }
 
 1;

@@ -1,4 +1,9 @@
 Revision history for Perl extension Monitoring::Availability.
 
+0.03  Sat Jan 16 20:46:54 CET 2010
+    - added resulting datastructure
+    - added read string/array/file/dir methods
+    - first tests
+
 0.01  Fri Jan 15 16:40:00 CET 2010
     - initial version

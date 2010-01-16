@@ -99,12 +99,12 @@ __DATA__
 [1260711580] Local time is Sun Dec 13 14:39:40 CET 2009: 39:40 CET 2009
 [1260711580] Nagios 3.0.6 starting... (PID=12480)
 [1260711581] Finished daemonizing... (New PID=12484)
-[1260715790] Error: Unable to create temp file for writing status data!: Unable to create temp file for writing status data!
+[1260715790] Error: Unable to create temp file for writing status data!
 [1260715801] Successfully shutdown... (PID=12502)
 [1260716221] Lockfile '/opt/projects/nagios/n1/var/nagios3.pid' looks like its already held by another instance of Nagios (PID 13226).  Bailing out...
-[1260722815] Warning: The check of host 'test_host_020' looks like it was orphaned (results never came back).  I'm scheduling an immediate check of the host...: The check of host 'test_host_020' looks like it was orphaned (results never came back).  I'm scheduling an immediate check of the host...
-[1260725492] Warning: Check result queue contained results for host 'test_host_105', but the host could not be found!  Perhaps you forgot to define the host in your config files?: Check result queue contained results for host 'test_host_105', but the host could not be found!  Perhaps you forgot to define the host in your config files?
-[1260725492] Warning: Check result queue contained results for service 'test_ok_04' on host 'test_host_131', but the service could not be found!  Perhaps you forgot to define the service in your config files?: Check result queue contained results for service 'test_ok_04' on host 'test_host_131', but the service could not be found!  Perhaps you forgot to define the service in your config files?
+[1260722815] Warning: The check of host 'test_host_020' looks like it was orphaned (results never came back).  I'm scheduling an immediate check of the host...
+[1260725492] Warning: Check result queue contained results for host 'test_host_105', but the host could not be found!  Perhaps you forgot to define the host in your config files?
+[1260725492] Warning: Check result queue contained results for service 'test_ok_04' on host 'test_host_131', but the service could not be found!  Perhaps you forgot to define the service in your config files?
 [1260971246] PROGRAM_RESTART event encountered, restarting...
 [1261050819] PASSIVE HOST CHECK: n1_test_router_00;0;blah blah blah
 [1261685289] SERVICE NOTIFICATION: test_contact;i0test_host_180;i0test_random_18;OK;notify-service;mo REVOVERED: random servicecheck recovered
@@ -122,4 +122,4 @@ __DATA__
 [1263423600] LOG ROTATION: DAILY: DAILY
 [1263457861] Auto-save of retention data completed successfully.
 [1263458022] Caught SIGTERM, shutting down...
-[1263648166] LOG VERSION: 2.0: 2.0
+[1263648166] LOG VERSION: 2.0
