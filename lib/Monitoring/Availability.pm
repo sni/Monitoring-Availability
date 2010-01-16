@@ -149,18 +149,52 @@ sub _reset_log_store {
     my $self   = shift;
     undef $self->{'logs'};
     $self->{'logs'} = [];
+    return 1;
 }
 
 ########################################
-sub _parse_log_string {
+sub _read_logs_from_string {
     my $self   = shift;
     my $string = shift;
-    $self->_reset_log_store;
     return unless defined $string;
-    for my $line (split/\n/, $string) {
+    for my $line (split/\n/mx, $string) {
         my $data = $self->_parse_line($line);
         push @{$self->{'logs'}}, $data if defined $data;
     }
+    return 1;
+}
+
+########################################
+sub _read_logs_from_file {
+    my $self   = shift;
+    my $file   = shift;
+    return unless defined $file;
+
+    open(my $FH, '<', $file) or croak('cannot read file '.$file.': '.$!);
+    while(my $line = <$FH>) {
+        chomp($line);
+        my $data = $self->_parse_line($line);
+        push @{$self->{'logs'}}, $data if defined $data;
+    }
+    close($FH);
+    return 1;
+}
+
+########################################
+sub _read_logs_from_dir {
+    my $self   = shift;
+    my $dir   = shift;
+
+    return unless defined $dir;
+
+    opendir(my $dh, $dir) or croak('cannot open directory '.$dir.': '.$!);
+    while(my $file = readdir($dh)) {
+        if($file =~ m/\.log$/mx) {
+            $self->_read_logs_from_file($dir.'/'.$file);
+        }
+    }
+    closedir $dh;
+
     return 1;
 }
 
@@ -246,6 +280,8 @@ sub _set_from_options {
         $data->{'service_description'} = $self->_strtok($string, ';');
         $data->{'start'}               = $self->_startstr_to_start($self->_strtok($string, ';'));
     }
+
+    return 1;
 }
 
 ########################################
@@ -255,20 +291,22 @@ sub _set_from_type {
     my $string = shift;
 
     # program starts
-    if($data->{'type'} =~ m/ starting\.\.\./) {
+    if($data->{'type'} =~ m/\ starting\.\.\./mx) {
         $data->{'start'} = 1;
     }
-    elsif($data->{'type'} =~ m/ restarting\.\.\./) {
+    elsif($data->{'type'} =~ m/\ restarting\.\.\./mx) {
         $data->{'start'} = 1;
     }
 
     # program stops
-    elsif($data->{'type'} =~ m/shutting down\.\.\./) {
+    elsif($data->{'type'} =~ m/shutting\ down\.\.\./mx) {
         $data->{'start'} = 0;
     }
-    elsif($data->{'type'} =~ m/Bailing out/) {
+    elsif($data->{'type'} =~ m/Bailing\ out/mx) {
         $data->{'start'} = 0;
     }
+
+    return 1;
 }
 
 ########################################

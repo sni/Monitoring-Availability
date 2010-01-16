@@ -3,8 +3,9 @@
 #########################
 
 use strict;
-use Test::More tests => 44;
+use Test::More tests => 48;
 use Data::Dumper;
+use File::Temp qw/ tempfile tempdir /;
 
 use_ok('Monitoring::Availability');
 
@@ -37,14 +38,46 @@ my $expected = [
 my $ma = Monitoring::Availability->new();
 isa_ok($ma, 'Monitoring::Availability', 'create new Monitoring::Availability object');
 
+####################################
+# try logs, line by line
 my $x = 0;
+my $logs;
 while(my $line = <DATA>) {
-    my $rt = $ma->_parse_log_string($line);
-    is($rt, 1, '_parse_log_string rc') or fail_out($x, $line, $ma);
+    $logs .= $line;
+    $ma->_reset_log_store;
+    my $rt = $ma->_read_logs_from_string($line);
+    is($rt, 1, '_read_logs_from_string rc') or fail_out($x, $line, $ma);
     is_deeply($ma->{'logs'}->[0], $expected->[$x], 'reading logs from string') or fail_out($x, $line, $ma);
     $x++;
 }
 
+####################################
+# write logs to temp file and load it
+my($fh,$filename) = tempfile(CLEANUP => 1);
+print $fh $logs;
+close($fh);
+
+$ma->_reset_log_store;
+my $rt = $ma->_read_logs_from_file($filename);
+is($rt, 1, '_read_logs_from_file rc');
+is_deeply($ma->{'logs'}, $expected, 'reading logs from file');
+
+####################################
+# write logs to temp dir and load it
+my $dir = tempdir( CLEANUP => 1 );
+open(my $logfile, '>', $dir.'/monitoring.log') or die('cannot write to '.$dir.'/monitoring.log: '.$!);
+print $logfile $logs;
+close($logfile);
+
+$ma->_reset_log_store;
+my $rt = $ma->_read_logs_from_dir($dir);
+is($rt, 1, '_read_logs_from_dir rc');
+is_deeply($ma->{'logs'}, $expected, 'reading logs from dir');
+
+
+
+####################################
+# fail and die with debug output
 sub fail_out {
     my $x    = shift;
     my $line = shift;
