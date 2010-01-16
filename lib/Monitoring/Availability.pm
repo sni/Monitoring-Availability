@@ -37,10 +37,6 @@ logs parameter.  Arguments are in key-value pairs.
 
 =over 4
 
-=item logs
-
-Array of logs
-
 =item rpttimeperiod
 
 report timeperiod. defines a timeperiod for this report. Will use 24x7 if not
@@ -88,23 +84,15 @@ sub new {
     my(%options) = @_;
 
     my $self = {
-        "verbose"                       => 0,       # enable verbose output
-        "hosts"                         => [],
-        "services"                      => [],
-        "log_string"                    => undef,   # logs from string
-        "log_array"                     => undef,   # logs from an array
-        "log_file"                      => undef,   # logs from a file
-        "log_dir"                       => undef,   # logs from a dir
-        "start"                         => undef,
-        "end"                           => undef,
-        "rpttimeperiod"                 => undef,
-        "assumeinitialstates"           => undef,
-        "assumestateretention"          => undef,
-        "assumestatesduringnotrunning"  => undef,
-        "includesoftstates"             => undef,
-        "initialassumedhoststate"       => undef,
-        "initialassumedservicestate"    => undef,
-        "backtrack"                     => 4,
+        'verbose'                       => 0,       # enable verbose output
+        'rpttimeperiod'                 => undef,
+        'assumeinitialstates'           => undef,
+        'assumestateretention'          => undef,
+        'assumestatesduringnotrunning'  => undef,
+        'includesoftstates'             => undef,
+        'initialassumedhoststate'       => undef,
+        'initialassumedservicestate'    => undef,
+        'backtrack'                     => 4,
     };
     bless $self, $class;
 
@@ -135,11 +123,94 @@ sub new {
 
 Calculate the availability
 
+=over 4
+
+=item start
+
+Timestamp of start
+
+=item end
+
+Timestamp of end
+
+=item log_string
+
+String containing the logs
+
+=item log_file
+
+File containing the logs
+
+=item log_dir
+
+Directory containing *.log files
+
+=item log_livestatus
+
+Array with logs from a livestatus query
+
+=back
+
 =cut
 
 sub calculate {
     my $self      = shift;
-    return(1);
+    my(%opts)     = @_;
+    my $options = {
+        'start'                         => undef,
+        'end'                           => undef,
+        'hosts'                         => [],
+        'services'                      => [],
+        'log_string'                    => undef,   # logs from string
+        'log_livestatus'                => undef,   # logs from a livestatus query
+        'log_file'                      => undef,   # logs from a file
+        'log_dir'                       => undef,   # logs from a dir
+        'rpttimeperiod'                 => $self->{'rpttimeperiod'},
+        'assumeinitialstates'           => $self->{'assumeinitialstates'}          || 1,
+        'assumestateretention'          => $self->{'assumestateretention'}         || 1,
+        'assumestatesduringnotrunning'  => $self->{'assumestatesduringnotrunning'} || 1,
+        'includesoftstates'             => $self->{'includesoftstates'}            || 0,
+        'initialassumedhoststate'       => $self->{'initialassumedhoststate'}      || 0,
+        'initialassumedservicestate'    => $self->{'initialassumedservicestate'}   || 0,
+        'backtrack'                     => $self->{'backtrack'}                    || 4,
+    };
+    my $result;
+
+    for my $opt_key (keys %opts) {
+        if(exists $options->{$opt_key}) {
+            $options->{$opt_key} = $opts{$opt_key};
+        }
+        else {
+            croak("unknown option: $opt_key");
+        }
+    }
+
+    # create lookup hash for faster access
+    $result->{'hosts'}    = {};
+    $result->{'services'} = {};
+    for my $host (@{$options->{'hosts'}}) {
+        $result->{'hosts'}->{$host} = 1;
+    }
+    for my $service (@{$options->{'services'}}) {
+        if(ref $service ne 'HASH') {
+            croak("services have to be an array of hashes, for example: [{host => 'hostname', service => 'description'}, ...]\ngot: ".Dumper($service));
+        }
+        $result->{'services'}->{$service->{'host'}}->{$service->{'service'}} = 1;
+    }
+    $options->{'calc_all'} = 0;
+    if(scalar keys %{$result->{'services'}} == 0 and scalar keys %{$result->{'services'}} == 0) {
+        $options->{'calc_all'} = 1;
+    }
+
+    #print "calculation availabity with:";
+    #print Dumper($options);
+    unless($options->{'calc_all'}) {
+        $self->_set_empty_hosts($result);
+        $self->_set_empty_services($result);
+    }
+    #print Dumper($result);
+
+    return($result);
 }
 
 ########################################
@@ -341,6 +412,65 @@ sub _statestr_to_state {
     return 2 if $string eq 'UNREACHABLE';
     return 3 if $string eq 'UNKNOWN';
     confess("unknown state: $string");
+}
+
+########################################
+sub _set_empty_hosts {
+    my $self = shift;
+    my $data = shift;
+    for my $host (values %{$data->{'hosts'}}) {
+        $host = {
+            'last_known_state'  => 0,
+            'earliest_time'     => 0,
+            'latest_time'       => 0,
+            'earliest_state'    => 0,
+            'latest_state'      => 0,
+
+            'time_up'           => 0,
+            'time_down'         => 0,
+            'time_unreachable'  => 0,
+
+            'scheduled_time_up'             => 0,
+            'scheduled_time_down'           => 0,
+            'scheduled_time_unreachable'    => 0,
+            'scheduled_time_indeterminate'  => 0,
+
+            'time_indeterminate_nodata'     => 0,
+            'time_indeterminate_notrunning' => 0,
+        };
+    }
+}
+
+########################################
+sub _set_empty_services {
+    my $self = shift;
+    my $data = shift;
+
+    for my $hostname (keys %{$data->{'services'}}) {
+        for my $service (values %{$data->{'services'}->{$hostname}}) {
+            $service = {
+                'last_known_state'  => 0,
+                'earliest_time'     => 0,
+                'latest_time'       => 0,
+                'earliest_state'    => 0,
+                'latest_state'      => 0,
+
+                'time_ok'           => 0,
+                'time_warning'      => 0,
+                'time_unknown'      => 0,
+                'time_critical'     => 0,
+
+                'scheduled_time_ok'             => 0,
+                'scheduled_time_warning'        => 0,
+                'scheduled_time_unknown'        => 0,
+                'scheduled_time_critical'       => 0,
+                'scheduled_time_indeterminate'  => 0,
+
+                'time_indeterminate_nodata'     => 0,
+                'time_indeterminate_notrunning' => 0,
+            };
+        }
+    }
 }
 
 1;
