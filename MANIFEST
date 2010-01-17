@@ -18,6 +18,14 @@ README
 t/01-Monitoring-Availability-basic_tests.t
 t/10-Monitoring-Availability-load_logs.t
 t/11-Monitoring-Availability-load_logs_livestatus.t
+t/20-Monitoring-Availability-host_up.t
+t/20-Monitoring-Availability-service_ok.t
+t/21-Monitoring-Availability-host_down.t
+t/21-Monitoring-Availability-service_warning.t
+t/22-Monitoring-Availability-host_unreachable.t
+t/22-Monitoring-Availability-service_critical.t
+t/23-Monitoring-Availability-service_unknown.t
+t/30-Monitoring-Availability-host_with_downtime.t
 t/30-Monitoring-Availability-service_with_hostdowntimes.t
 t/97-Pod.t
 t/98-Pod-Coverage.t
