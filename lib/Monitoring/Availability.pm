@@ -6,7 +6,7 @@ use warnings;
 use Data::Dumper;
 use Carp;
 
-our $VERSION = '0.03_2';
+our $VERSION = '0.03_3';
 
 
 =head1 NAME
@@ -204,7 +204,7 @@ sub calculate {
         $result->{'services'}->{$service->{'host'}}->{$service->{'service'}} = 1;
     }
     $options->{'calc_all'} = 0;
-    if(scalar keys %{$result->{'services'}} == 0 and scalar keys %{$result->{'services'}} == 0) {
+    if(scalar keys %{$result->{'services'}} == 0 and scalar keys %{$result->{'hosts'}} == 0) {
         $self->_log('will calculate availability for all hosts/services found');
         $options->{'calc_all'} = 1;
     }
@@ -700,7 +700,10 @@ sub _process_log_line {
     if(defined $data->{'host_name'}) {
         my $host_hist = $self->{'host_data'}->{$data->{'host_name'}};
 
-        if($data->{'type'} eq 'HOST DOWNTIME ALERT') {
+        if($data->{'type'} eq 'CURRENT HOST STATE' or $data->{'type'} eq 'HOST ALERT' or $data->{'type'} eq 'INITIAL HOST STATE') {
+            $self->_set_host_event($data->{'host_name'}, $result, $options, $data);
+        }
+        elsif($data->{'type'} eq 'HOST DOWNTIME ALERT') {
 
             $self->_log('_process_log_line() hostdowntime, inserting fake event for all services');
             # set an event for all services
@@ -796,11 +799,6 @@ sub _set_service_event {
             elsif($service_hist->{'last_state'} == -2) {
                 $self->_log('_set_service_event() not_running + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $service_data->{'time_indeterminate_notrunning'} += $diff;
-                # no downtimes during not running
-                #if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
-                #    $self->_log('_set_service_event() indeterminate sched + '.$diff.' seconds');
-                #    $service_data->{'scheduled_time_indeterminate'} += $diff
-                #}
             }
         }
     }
@@ -816,6 +814,87 @@ sub _set_service_event {
 
     return 1;
 }
+
+
+########################################
+sub _set_host_event {
+    my $self                = shift;
+    my $host_name           = shift;
+    my $result              = shift;
+    my $options             = shift;
+    my $data                = shift;
+
+    $self->_log('_set_host_event()');
+
+    my $host_hist = $self->{'host_data'}->{$host_name};
+    my $host_data = $result->{'hosts'}->{$host_name};
+
+    # check if we are inside the report time
+    if($options->{'start'} < $data->{'time'} and $options->{'end'} >= $data->{'time'}) {
+        # we got a last state?
+        if(defined $host_hist->{'last_state'}) {
+            my $diff = $data->{'time'} - $host_hist->{'last_state_time'};
+
+            # up
+            if($host_hist->{'last_state'} == 0) {
+                $self->_log('_set_host_event() up + '.$diff.' seconds ('.$self->_duration($diff).')');
+                $host_data->{'time_up'} += $diff;
+                if($host_hist->{'in_downtime'}) {
+                    $self->_log('_set_host_event() up sched + '.$diff.' seconds');
+                    $host_data->{'scheduled_time_up'} += $diff
+                }
+            }
+
+            # down
+            elsif($host_hist->{'last_state'} == 1) {
+                $self->_log('_set_host_event() down + '.$diff.' seconds');
+                $host_data->{'time_down'} += $diff;
+                if($host_hist->{'in_downtime'}) {
+                    $self->_log('_set_host_event() down sched + '.$diff.' seconds');
+                    $host_data->{'scheduled_time_down'} += $diff
+                }
+            }
+
+            # unreachable
+            elsif($host_hist->{'last_state'} == 2) {
+                $self->_log('_set_host_event() unreachable + '.$diff.' seconds ('.$self->_duration($diff).')');
+                $host_data->{'time_unreachable'} += $diff;
+                if($host_hist->{'in_downtime'}) {
+                    $self->_log('_set_host_event() unreachable sched + '.$diff.' seconds');
+                    $host_data->{'scheduled_time_unreachable'} += $diff
+                }
+            }
+
+            # no data yet
+            elsif($host_hist->{'last_state'} == -1) {
+                $self->_log('_set_host_event() indeterminate + '.$diff.' seconds ('.$self->_duration($diff).')');
+                $host_data->{'time_indeterminate_nodata'} += $diff;
+                if($host_hist->{'in_downtime'}) {
+                    $self->_log('_set_host_event() indeterminate sched + '.$diff.' seconds');
+                    $host_data->{'scheduled_time_indeterminate'} += $diff
+                }
+            }
+
+            # not running
+            elsif($host_hist->{'last_state'} == -2) {
+                $self->_log('_set_host_event() not_running + '.$diff.' seconds ('.$self->_duration($diff).')');
+                $host_data->{'time_indeterminate_notrunning'} += $diff;
+            }
+        }
+    }
+
+    # set last state
+    if(defined $data->{'state'}) {
+        $self->_log('_set_host_event() set last state = '.$data->{'state'});
+        $host_hist->{'last_state'} = $data->{'state'};
+
+        $host_hist->{'last_known_state'} = $data->{'state'} if $data->{'state'} >= 0;
+    }
+    $host_hist->{'last_state_time'} = $data->{'time'};
+
+    return 1;
+}
+
 
 ########################################
 sub _log {
