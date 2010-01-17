@@ -1,0 +1,7 @@
+TODO LIST for Monitoring::Availability
+======================================
+
+ - verify options and convert yes/no 1/0 to proper ints
+   - check initial states
+ - timeperiod support
+ - filter out log from not wanted host/services or soft states

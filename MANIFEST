@@ -18,7 +18,7 @@ README
 t/01-Monitoring-Availability-basic_tests.t
 t/10-Monitoring-Availability-load_logs.t
 t/11-Monitoring-Availability-load_logs_livestatus.t
-t/20-Monitoring-Availability-sample_log_1.t
+t/30-Monitoring-Availability-service_with_hostdowntimes.t
 t/97-Pod.t
 t/98-Pod-Coverage.t
 t/99-Perl-Critic.t

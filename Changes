@@ -4,6 +4,10 @@ Revision history for Perl extension Monitoring::Availability.
     - added resulting datastructure
     - added read string/array/file/dir methods
     - first tests
+    - implemented assumestatesduringnotrunning option
+    - implemented service availability calculation
+    - implemented hostdowntimes
+    - implemented servicedowntimes
 
 0.01  Fri Jan 15 16:40:00 CET 2010
     - initial version

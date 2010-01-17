@@ -40,6 +40,6 @@ my $expected = [
 
 my $ma = Monitoring::Availability->new();
 isa_ok($ma, 'Monitoring::Availability', 'create new Monitoring::Availability object');
-my $rc = $ma->_read_logs_from_livestatus($livestatus_logs);
-is($rc, 1, '_read_logs_from_livestatus rc');
+my $rc = $ma->_store_logs_from_livestatus($livestatus_logs);
+is($rc, 1, '_store_logs_from_livestatus rc');
 is_deeply($ma->{'logs'}, $expected, 'sample 1 result');

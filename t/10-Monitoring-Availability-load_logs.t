@@ -51,8 +51,8 @@ my $logs;
 while(my $line = <DATA>) {
     $logs .= $line;
     $ma->_reset_log_store;
-    my $rt = $ma->_read_logs_from_string($line);
-    is($rt, 1, '_read_logs_from_string rc') or fail_out($x, $line, $ma);
+    my $rt = $ma->_store_logs_from_string($line);
+    is($rt, 1, '_store_logs_from_string rc') or fail_out($x, $line, $ma);
     is_deeply($ma->{'logs'}->[0], $expected->[$x], 'reading logs from string') or fail_out($x, $line, $ma);
     $x++;
 }
@@ -64,8 +64,8 @@ print $fh $logs;
 close($fh);
 
 $ma->_reset_log_store;
-my $rt = $ma->_read_logs_from_file($filename);
-is($rt, 1, '_read_logs_from_file rc');
+my $rt = $ma->_store_logs_from_file($filename);
+is($rt, 1, '_store_logs_from_file rc');
 is_deeply($ma->{'logs'}, $expected, 'reading logs from file');
 
 ####################################
@@ -76,8 +76,8 @@ print $logfile $logs;
 close($logfile);
 
 $ma->_reset_log_store;
-$rt = $ma->_read_logs_from_dir($dir);
-is($rt, 1, '_read_logs_from_dir rc');
+$rt = $ma->_store_logs_from_dir($dir);
+is($rt, 1, '_store_logs_from_dir rc');
 is_deeply($ma->{'logs'}, $expected, 'reading logs from dir');
 
 
