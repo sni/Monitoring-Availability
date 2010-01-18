@@ -1,5 +1,8 @@
 Revision history for Perl extension Monitoring::Availability.
 
+0.04  Mon Jan 18 08:06:59 CET 2010
+    - added message when passing wrong services
+
 0.03  Sat Jan 16 20:46:54 CET 2010
     - added resulting datastructure
     - added read string/array/file/dir methods

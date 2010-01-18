@@ -6,7 +6,7 @@ use warnings;
 use Data::Dumper;
 use Carp;
 
-our $VERSION = '0.03_3';
+our $VERSION = '0.04';
 
 
 =head1 NAME
@@ -199,6 +199,9 @@ sub calculate {
     }
     for my $service (@{$options->{'services'}}) {
         if(ref $service ne 'HASH') {
+            croak("services have to be an array of hashes, for example: [{host => 'hostname', service => 'description'}, ...]\ngot: ".Dumper($service));
+        }
+        if(!defined $service->{'host'} or !defined $service->{'service'}) {
             croak("services have to be an array of hashes, for example: [{host => 'hostname', service => 'description'}, ...]\ngot: ".Dumper($service));
         }
         $result->{'services'}->{$service->{'host'}}->{$service->{'service'}} = 1;
