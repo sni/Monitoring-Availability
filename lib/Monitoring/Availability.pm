@@ -6,7 +6,7 @@ use warnings;
 use Data::Dumper;
 use Carp;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05_1';
 
 
 =head1 NAME
@@ -580,63 +580,31 @@ sub _compute_availability_from_log_store {
     for my $data (@{$self->{'logs'}}) {
         # if we reach the start date of our report, insert a fake entry
         if($last_time < $options->{'start'} and $data->{'time'} > $options->{'start'}) {
-            $self->_log('_compute_availability_from_log_store() report start reached, insert fake data');
-            for my $host (keys %{$result->{'services'}}) {
-                for my $service (keys %{$result->{'services'}->{$host}}) {
-                    my $fakedata = {
-                        'service_description' => $service,
-                        'time'                => $options->{'start'},
-                        'host_name'           => $host,
-                        'type'                => 'INITIAL SERVICE STATE',
-                        'hard'                => 1,
-                        'state'               => $self->{'service_data'}->{$host}->{$service}->{'last_state'} || -1,
-                    };
-                    $self->_process_log_line($result, $options, $fakedata);
-                }
-            }
-
-            for my $host (keys %{$result->{'hosts'}}) {
-                my $fakedata = {
-                    'time'                => $options->{'start'},
-                    'host_name'           => $host,
-                    'type'                => 'INITIAL HOST STATE',
-                    'hard'                => 1,
-                    'state'               => $self->{'host_data'}->{$host}->{'last_state'} || -1,
-                };
-                $self->_process_log_line($result, $options, $fakedata);
-            }
+            $self->_insert_fake_start_event($result, $options);
         }
-        $last_time = $data->{'time'};
+
+        # end of report reached, insert fake end event
+        if($data->{'time'} > $options->{'end'} and $last_time < $options->{'end'}) {
+            $self->_insert_fake_end_event($result, $options);
+        }
 
         # now process the real line
         $self->_process_log_line($result, $options, $data);
+
+        # set timestamp of last log line
+        $last_time = $data->{'time'};
     }
 
-    # process a fake last entry with our last known state
-    $self->_log('_compute_availability_from_log_store() report end reached, insert fake data');
-    for my $host (keys %{$result->{'services'}}) {
-        for my $service (keys %{$result->{'services'}->{$host}}) {
-            my $fakedata = {
-                'service_description' => $service,
-                'time'                => $options->{'end'},
-                'host_name'           => $host,
-                'type'                => 'INITIAL SERVICE STATE',
-                'hard'                => 1,
-                'state'               => $self->{'service_data'}->{$host}->{$service}->{'last_state'},
-            };
-            $self->_process_log_line($result, $options, $fakedata);
-        }
+    # processing logfiles finished
+
+    # no start event yet, insert a fake entry
+    if($last_time < $options->{'start'}) {
+        $self->_insert_fake_start_event($result, $options);
     }
 
-    for my $host (keys %{$result->{'hosts'}}) {
-        my $fakedata = {
-            'time'                => $options->{'end'},
-            'host_name'           => $host,
-            'type'                => 'INITIAL HOST STATE',
-            'hard'                => 1,
-            'state'               => $self->{'host_data'}->{$host}->{'last_state'},
-        };
-        $self->_process_log_line($result, $options, $fakedata);
+    # no end event yet, insert fake end event
+    if($last_time < $options->{'end'}) {
+        $self->_insert_fake_end_event($result, $options);
     }
 
     return 1;
@@ -948,7 +916,77 @@ sub _duration {
 }
 
 ########################################
+sub _insert_fake_start_event {
+    my $self    = shift;
+    my $result  = shift;
+    my $options = shift;
 
+    $self->_log('_insert_fake_start_event()');
+    for my $host (keys %{$result->{'services'}}) {
+        for my $service (keys %{$result->{'services'}->{$host}}) {
+            my $fakedata = {
+                'service_description' => $service,
+                'time'                => $options->{'start'},
+                'host_name'           => $host,
+                'type'                => 'INITIAL SERVICE STATE',
+                'hard'                => 1,
+                'state'               => $self->{'service_data'}->{$host}->{$service}->{'last_state'} || -1,
+            };
+            $self->_process_log_line($result, $options, $fakedata);
+        }
+    }
+
+    for my $host (keys %{$result->{'hosts'}}) {
+        my $fakedata = {
+            'time'                => $options->{'start'},
+            'host_name'           => $host,
+            'type'                => 'INITIAL HOST STATE',
+            'hard'                => 1,
+            'state'               => $self->{'host_data'}->{$host}->{'last_state'} || -1,
+        };
+        $self->_process_log_line($result, $options, $fakedata);
+    }
+
+    return 1;
+}
+
+########################################
+sub _insert_fake_end_event {
+    my $self    = shift;
+    my $result  = shift;
+    my $options = shift;
+
+    # process a fake last entry with our last known state
+    $self->_log('_insert_fake_end_event()');
+    for my $host (keys %{$result->{'services'}}) {
+        for my $service (keys %{$result->{'services'}->{$host}}) {
+            my $fakedata = {
+                'service_description' => $service,
+                'time'                => $options->{'end'},
+                'host_name'           => $host,
+                'type'                => 'INITIAL SERVICE STATE',
+                'hard'                => 1,
+                'state'               => $self->{'service_data'}->{$host}->{$service}->{'last_state'},
+            };
+            $self->_process_log_line($result, $options, $fakedata);
+        }
+    }
+
+    for my $host (keys %{$result->{'hosts'}}) {
+        my $fakedata = {
+            'time'                => $options->{'end'},
+            'host_name'           => $host,
+            'type'                => 'INITIAL HOST STATE',
+            'hard'                => 1,
+            'state'               => $self->{'host_data'}->{$host}->{'last_state'},
+        };
+        $self->_process_log_line($result, $options, $fakedata);
+    }
+
+    return 1;
+}
+
+########################################
 
 1;
 
