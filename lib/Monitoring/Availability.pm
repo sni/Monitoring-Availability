@@ -6,7 +6,7 @@ use warnings;
 use Data::Dumper;
 use Carp;
 
-our $VERSION = '0.05_1';
+our $VERSION = '0.05_2';
 
 
 =head1 NAME
@@ -78,6 +78,24 @@ verbose mode
 
 =cut
 
+use constant {
+    YES                 => 1,
+    NO                  => 0,
+
+    STATE_NOT_RUNNING   => -3,
+    STATE_UNSPECIFIED   => -2,
+    STATE_CURRENT       => -1,
+
+    STATE_UP            =>  0,
+    STATE_DOWN          =>  1,
+    STATE_UNREACHABLE   =>  2,
+
+    STATE_OK            =>  0,
+    STATE_WARNING       =>  1,
+    STATE_CRITICAL      =>  2,
+    STATE_UNKNOWN       =>  3,
+};
+
 sub new {
     my $class = shift;
     unshift(@_, "peer") if scalar @_ == 1;
@@ -93,9 +111,15 @@ sub new {
         'includesoftstates'             => undef,
         'initialassumedhoststate'       => undef,
         'initialassumedservicestate'    => undef,
-        'backtrack'                     => 4,
+        'show_log_entries'              => undef,
+        'full_log_entries'              => undef,
+        'backtrack'                     => undef,
     };
+
     bless $self, $class;
+
+    # verify the options we got so far
+    $self = $self->_verify_options($self);
 
     for my $opt_key (keys %options) {
         if(exists $self->{$opt_key}) {
@@ -178,6 +202,8 @@ sub calculate {
         'initialassumedhoststate'       => $self->{'initialassumedhoststate'},
         'initialassumedservicestate'    => $self->{'initialassumedservicestate'},
         'backtrack'                     => $self->{'backtrack'},
+        'show_log_entries'              => $self->{'show_log_entries'},
+        'full_log_entries'              => $self->{'full_log_entries'},
     };
     $self->_log('calculate()');
     my $result;
@@ -190,6 +216,9 @@ sub calculate {
             croak("unknown option: $opt_key");
         }
     }
+
+    $options = $self->_set_default_options($options);
+    $options = $self->_verify_options($options);
 
     # create lookup hash for faster access
     $result->{'hosts'}    = {};
@@ -483,7 +512,7 @@ sub _set_empty_hosts {
     my $options = shift;
     my $data    = shift;
 
-    my $initial_assumend_state = -1;
+    my $initial_assumend_state = STATE_UNSPECIFIED;
     if($options->{'assumeinitialstates'}) {
         $initial_assumend_state = $options->{'initialassumedhoststate'};
     }
@@ -520,8 +549,8 @@ sub _set_empty_services {
     my $data    = shift;
     $self->_log('_set_empty_services()');
 
-    my $initial_assumend_state      = -1;
-    my $initial_assumend_host_state = -1;
+    my $initial_assumend_state      = STATE_UNSPECIFIED;
+    my $initial_assumend_host_state = STATE_UNSPECIFIED;
     if($options->{'assumeinitialstates'}) {
         $initial_assumend_state      = $options->{'initialassumedservicestate'};
         $initial_assumend_host_state = $options->{'initialassumedhoststate'};
@@ -631,7 +660,7 @@ sub _process_log_line {
                 for my $host_name (keys %{$self->{'service_data'}}) {
                     for my $service_description (keys %{$self->{'service_data'}->{$host_name}}) {
                         my $last_known_state = $self->{'service_data'}->{$host_name}->{$service_description}->{'last_known_state'};
-                        my $last_state = -1;
+                        my $last_state = STATE_UNSPECIFIED;
                         $last_state = $last_known_state if defined $last_known_state and $last_known_state >= 0;
                         $self->_set_service_event($host_name, $service_description, $result, $options, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'}, 'state' => $last_state });
                     }
@@ -641,7 +670,7 @@ sub _process_log_line {
                 $self->_log('_process_log_line() process stop, inserting fake event for all services');
                 for my $host_name (keys %{$self->{'service_data'}}) {
                     for my $service_description (keys %{$self->{'service_data'}->{$host_name}}) {
-                        $self->_set_service_event($host_name, $service_description, $result, $options, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'}, 'state' => -2 });
+                        $self->_set_service_event($host_name, $service_description, $result, $options, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'}, 'state' => STATE_NOT_RUNNING });
                     }
                 }
             }
@@ -717,7 +746,7 @@ sub _set_service_event {
             my $diff = $data->{'time'} - $service_hist->{'last_state_time'};
 
             # ok
-            if($service_hist->{'last_state'} == 0) {
+            if($service_hist->{'last_state'} == STATE_OK) {
                 $self->_log('_set_service_event() ok + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $service_data->{'time_ok'} += $diff;
                 if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
@@ -727,7 +756,7 @@ sub _set_service_event {
             }
 
             # warning
-            elsif($service_hist->{'last_state'} == 1) {
+            elsif($service_hist->{'last_state'} == STATE_WARNING) {
                 $self->_log('_set_service_event() warning + '.$diff.' seconds');
                 $service_data->{'time_warning'} += $diff;
                 if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
@@ -737,7 +766,7 @@ sub _set_service_event {
             }
 
             # critical
-            elsif($service_hist->{'last_state'} == 2) {
+            elsif($service_hist->{'last_state'} == STATE_CRITICAL) {
                 $self->_log('_set_service_event() critical + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $service_data->{'time_critical'} += $diff;
                 if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
@@ -747,7 +776,7 @@ sub _set_service_event {
             }
 
             # unknown
-            elsif($service_hist->{'last_state'} == 3) {
+            elsif($service_hist->{'last_state'} == STATE_UNKNOWN) {
                 $self->_log('_set_service_event() unknown + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $service_data->{'time_unknown'} += $diff;
                 if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
@@ -757,7 +786,7 @@ sub _set_service_event {
             }
 
             # no data yet
-            elsif($service_hist->{'last_state'} == -1) {
+            elsif($service_hist->{'last_state'} == STATE_UNSPECIFIED) {
                 $self->_log('_set_service_event() indeterminate + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $service_data->{'time_indeterminate_nodata'} += $diff;
                 if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
@@ -767,7 +796,7 @@ sub _set_service_event {
             }
 
             # not running
-            elsif($service_hist->{'last_state'} == -2) {
+            elsif($service_hist->{'last_state'} == STATE_NOT_RUNNING) {
                 $self->_log('_set_service_event() not_running + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $service_data->{'time_indeterminate_notrunning'} += $diff;
             }
@@ -807,7 +836,7 @@ sub _set_host_event {
             my $diff = $data->{'time'} - $host_hist->{'last_state_time'};
 
             # up
-            if($host_hist->{'last_state'} == 0) {
+            if($host_hist->{'last_state'} == STATE_UP) {
                 $self->_log('_set_host_event() up + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $host_data->{'time_up'} += $diff;
                 if($host_hist->{'in_downtime'}) {
@@ -817,7 +846,7 @@ sub _set_host_event {
             }
 
             # down
-            elsif($host_hist->{'last_state'} == 1) {
+            elsif($host_hist->{'last_state'} == STATE_DOWN) {
                 $self->_log('_set_host_event() down + '.$diff.' seconds');
                 $host_data->{'time_down'} += $diff;
                 if($host_hist->{'in_downtime'}) {
@@ -827,7 +856,7 @@ sub _set_host_event {
             }
 
             # unreachable
-            elsif($host_hist->{'last_state'} == 2) {
+            elsif($host_hist->{'last_state'} == STATE_UNREACHABLE) {
                 $self->_log('_set_host_event() unreachable + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $host_data->{'time_unreachable'} += $diff;
                 if($host_hist->{'in_downtime'}) {
@@ -837,7 +866,7 @@ sub _set_host_event {
             }
 
             # no data yet
-            elsif($host_hist->{'last_state'} == -1) {
+            elsif($host_hist->{'last_state'} == STATE_UNSPECIFIED) {
                 $self->_log('_set_host_event() indeterminate + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $host_data->{'time_indeterminate_nodata'} += $diff;
                 if($host_hist->{'in_downtime'}) {
@@ -847,7 +876,7 @@ sub _set_host_event {
             }
 
             # not running
-            elsif($host_hist->{'last_state'} == -2) {
+            elsif($host_hist->{'last_state'} == STATE_NOT_RUNNING) {
                 $self->_log('_set_host_event() not_running + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $host_data->{'time_indeterminate_notrunning'} += $diff;
             }
@@ -924,25 +953,33 @@ sub _insert_fake_start_event {
     $self->_log('_insert_fake_start_event()');
     for my $host (keys %{$result->{'services'}}) {
         for my $service (keys %{$result->{'services'}->{$host}}) {
+            my $last_service_state = STATE_UNSPECIFIED;
+            if(defined $self->{'service_data'}->{$host}->{$service}->{'last_state'}) {
+                $last_service_state = $self->{'service_data'}->{$host}->{$service}->{'last_state'};
+            }
             my $fakedata = {
                 'service_description' => $service,
                 'time'                => $options->{'start'},
                 'host_name'           => $host,
                 'type'                => 'INITIAL SERVICE STATE',
                 'hard'                => 1,
-                'state'               => $self->{'service_data'}->{$host}->{$service}->{'last_state'} || -1,
+                'state'               => $last_service_state,
             };
             $self->_process_log_line($result, $options, $fakedata);
         }
     }
 
     for my $host (keys %{$result->{'hosts'}}) {
+        my $last_host_state = STATE_UNSPECIFIED;
+        if(defined $self->{'host_data'}->{$host}->{'last_state'}) {
+            $last_host_state = $self->{'host_data'}->{$host}->{'last_state'};
+        }
         my $fakedata = {
             'time'                => $options->{'start'},
             'host_name'           => $host,
             'type'                => 'INITIAL HOST STATE',
             'hard'                => 1,
-            'state'               => $self->{'host_data'}->{$host}->{'last_state'} || -1,
+            'state'               => $last_host_state,
         };
         $self->_process_log_line($result, $options, $fakedata);
     }
@@ -984,6 +1021,98 @@ sub _insert_fake_end_event {
     }
 
     return 1;
+}
+
+########################################
+sub _set_default_options {
+    my $self    = shift;
+    my $options = shift;
+
+    $options->{'backtrack'}                    = 4             unless defined $options->{'backtrack'};
+    $options->{'assumeinitialstates'}          = 'yes'         unless defined $options->{'assumeinitialstates'};
+    $options->{'assumestateretention'}         = 'yes'         unless defined $options->{'assumestateretention'};
+    $options->{'assumestatesduringnotrunning'} = 'yes'         unless defined $options->{'assumestatesduringnotrunning'};
+    $options->{'includesoftstates'}            = 'no'          unless defined $options->{'includesoftstates'};
+    $options->{'initialassumedhoststate'}      = 'unspecified' unless defined $options->{'initialassumedhoststate'};
+    $options->{'initialassumedservicestate'}   = 'unspecified' unless defined $options->{'initialassumedservicestate'};
+
+    return $options;
+}
+
+########################################
+sub _verify_options {
+    my $self    = shift;
+    my $options = shift;
+
+    # set default backtrack to 4 days
+    if(defined $options->{'backtrack'}) {
+        if($options->{'backtrack'} < 0) {
+            $options->{'backtrack'} = 4;
+        }
+    }
+
+    # our yes no options
+    for my $yes_no (qw/assumeinitialstates assumestateretention assumestatesduringnotrunning includesoftstates/) {
+        if(defined $options->{$yes_no}) {
+            if(lc $options->{$yes_no} eq 'yes') {
+                $options->{$yes_no} = YES;
+            }
+            elsif(lc $options->{$yes_no} eq 'no') {
+                $options->{$yes_no} = NO;
+            } else {
+                croak($yes_no.' unknown, please use \'yes\' or \'no\'. Got: '.$options->{$yes_no});
+            }
+        }
+    }
+
+    # set initial assumed host state
+    if(defined $options->{'initialassumedhoststate'}) {
+        if(lc $options->{'initialassumedhoststate'} eq 'unspecified') {
+            $options->{'initialassumedhoststate'} = STATE_UNSPECIFIED;
+        }
+        elsif(lc $options->{'initialassumedhoststate'} eq 'current') {
+            $options->{'initialassumedhoststate'} = STATE_CURRENT;
+        }
+        elsif(lc $options->{'initialassumedhoststate'} eq 'up') {
+            $options->{'initialassumedhoststate'} = STATE_UP;
+        }
+        elsif(lc $options->{'initialassumedhoststate'} eq 'down') {
+            $options->{'initialassumedhoststate'} = STATE_DOWN;
+        }
+        elsif(lc $options->{'initialassumedhoststate'} eq 'unreachable') {
+            $options->{'initialassumedhoststate'} = STATE_UNREACHABLE;
+        }
+        else {
+            croak('initialassumedhoststate unknown, please use one of: unspecified, current, up, down or unreachable. Got: '.$options->{'initialassumedhoststate'});
+        }
+    }
+
+    # set initial assumed service state
+    if(defined $options->{'initialassumedservicestate'}) {
+        if(lc $options->{'initialassumedservicestate'} eq 'unspecified') {
+            $options->{'initialassumedservicestate'} = STATE_UNSPECIFIED;
+        }
+        elsif(lc $options->{'initialassumedservicestate'} eq 'current') {
+            $options->{'initialassumedservicestate'} = STATE_CURRENT;
+        }
+        elsif(lc $options->{'initialassumedservicestate'} eq 'ok') {
+            $options->{'initialassumedservicestate'} = STATE_OK;
+        }
+        elsif(lc $options->{'initialassumedservicestate'} eq 'warning') {
+            $options->{'initialassumedservicestate'} = STATE_WARNING;
+        }
+        elsif(lc $options->{'initialassumedservicestate'} eq 'unknown') {
+            $options->{'initialassumedservicestate'} = STATE_UNKNOWN;
+        }
+        elsif(lc $options->{'initialassumedservicestate'} eq 'critical') {
+            $options->{'initialassumedservicestate'} = STATE_CRITICAL;
+        }
+        else {
+            croak('initialassumedservicestate unknown, please use one of: unspecified, current, ok, warning, unknown or critical. Got: '.$options->{'initialassumedservicestate'});
+        }
+    }
+
+    return $options;
 }
 
 ########################################

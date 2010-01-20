@@ -2,6 +2,7 @@ Revision history for Perl extension Monitoring::Availability.
 
 0.05  in progress
     - fixed reports when logfiles are totally out of report range
+    - changed the way of settings options
 
 0.04  Mon Jan 18 08:06:59 CET 2010
     - added message when passing wrong services

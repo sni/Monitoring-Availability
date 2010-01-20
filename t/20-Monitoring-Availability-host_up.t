@@ -60,9 +60,9 @@ my $ma = Monitoring::Availability->new(
     'backtrack'                     => 4,
     'assumestateretention'          => 'yes',
     'assumeinitialstates'           => 'yes',
-    'assumestatesduringnotrunning'  => 0,
-    'initialassumedhoststate'       => 0,
-    'initialassumedservicestate'    => 0,
+    'assumestatesduringnotrunning'  => 'yes',
+    'initialassumedhoststate'       => 'unspecified',
+    'initialassumedservicestate'    => 'unspecified',
 );
 isa_ok($ma, 'Monitoring::Availability', 'create new Monitoring::Availability object');
 my $result = $ma->calculate(
