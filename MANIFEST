@@ -25,6 +25,8 @@ t/21-Monitoring-Availability-service_warning.t
 t/22-Monitoring-Availability-host_unreachable.t
 t/22-Monitoring-Availability-service_critical.t
 t/23-Monitoring-Availability-service_unknown.t
+t/24-Monitoring-Availability-service_ok2.t
+t/25-Monitoring-Availability-service.t
 t/30-Monitoring-Availability-host_with_downtime.t
 t/30-Monitoring-Availability-service_with_hostdowntimes.t
 t/97-Pod.t

@@ -6,7 +6,7 @@ use warnings;
 use Data::Dumper;
 use Carp;
 
-our $VERSION = '0.05_2';
+our $VERSION = '0.05_3';
 
 
 =head1 NAME
@@ -44,31 +44,35 @@ specified.
 
 =item assumeinitialstates
 
-Assume the initial host/service state if none is found.
+Assume the initial host/service state if none is found, default: yes
 
 =item assumestateretention
 
-Assume state retention
+Assume state retention, default: yes
 
 =item assumestatesduringnotrunning
 
-Assume state during times when the monitoring process is not running
+Assume state during times when the monitoring process is not running, default: yes
 
 =item includesoftstates
 
-Include soft states in the calculation. Only hard states are used otherwise.
+Include soft states in the calculation. Only hard states are used otherwise, default: no
 
 =item initialassumedhoststate
 
-Assumed host state if none is found
+Assumed host state if none is found, default: yes
 
 =item initialassumedservicestate
 
-Assumed service state if none is found
+Assumed service state if none is found, default: yes
 
 =item backtrack
 
-Go back this amount of days to find initial states
+Go back this amount of days to find initial states, default: 4
+
+=item services_inherit_hostdowntimes
+
+Services will inherit downtimes from hosts, default: no
 
 =item verbose
 
@@ -102,18 +106,18 @@ sub new {
     my(%options) = @_;
 
     my $self = {
-        'verbose'                       => 0,       # enable verbose output
-        'logger'                        => undef,   # logger object used for verbose output
-        'rpttimeperiod'                 => undef,
-        'assumeinitialstates'           => undef,
-        'assumestateretention'          => undef,
-        'assumestatesduringnotrunning'  => undef,
-        'includesoftstates'             => undef,
-        'initialassumedhoststate'       => undef,
-        'initialassumedservicestate'    => undef,
-        'show_log_entries'              => undef,
-        'full_log_entries'              => undef,
-        'backtrack'                     => undef,
+        'verbose'                        => 0,       # enable verbose output
+        'logger'                         => undef,   # logger object used for verbose output
+        'rpttimeperiod'                  => undef,
+        'assumeinitialstates'            => undef,
+        'assumestateretention'           => undef,
+        'assumestatesduringnotrunning'   => undef,
+        'includesoftstates'              => undef,
+        'initialassumedhoststate'        => undef,
+        'initialassumedservicestate'     => undef,
+        'backtrack'                      => undef,
+        'showscheduleddowntime'          => undef,
+        'services_inherit_hostdowntimes' => undef,
     };
 
     bless $self, $class;
@@ -186,24 +190,24 @@ sub calculate {
     my $self      = shift;
     my(%opts)     = @_;
     my $options = {
-        'start'                         => undef,
-        'end'                           => undef,
-        'hosts'                         => [],
-        'services'                      => [],
-        'log_string'                    => undef,   # logs from string
-        'log_livestatus'                => undef,   # logs from a livestatus query
-        'log_file'                      => undef,   # logs from a file
-        'log_dir'                       => undef,   # logs from a dir
-        'rpttimeperiod'                 => $self->{'rpttimeperiod'},
-        'assumeinitialstates'           => $self->{'assumeinitialstates'},
-        'assumestateretention'          => $self->{'assumestateretention'},
-        'assumestatesduringnotrunning'  => $self->{'assumestatesduringnotrunning'},
-        'includesoftstates'             => $self->{'includesoftstates'},
-        'initialassumedhoststate'       => $self->{'initialassumedhoststate'},
-        'initialassumedservicestate'    => $self->{'initialassumedservicestate'},
-        'backtrack'                     => $self->{'backtrack'},
-        'show_log_entries'              => $self->{'show_log_entries'},
-        'full_log_entries'              => $self->{'full_log_entries'},
+        'start'                          => undef,
+        'end'                            => undef,
+        'hosts'                          => [],
+        'services'                       => [],
+        'log_string'                     => undef,   # logs from string
+        'log_livestatus'                 => undef,   # logs from a livestatus query
+        'log_file'                       => undef,   # logs from a file
+        'log_dir'                        => undef,   # logs from a dir
+        'rpttimeperiod'                  => $self->{'rpttimeperiod'},
+        'assumeinitialstates'            => $self->{'assumeinitialstates'},
+        'assumestateretention'           => $self->{'assumestateretention'},
+        'assumestatesduringnotrunning'   => $self->{'assumestatesduringnotrunning'},
+        'includesoftstates'              => $self->{'includesoftstates'},
+        'initialassumedhoststate'        => $self->{'initialassumedhoststate'},
+        'initialassumedservicestate'     => $self->{'initialassumedservicestate'},
+        'backtrack'                      => $self->{'backtrack'},
+        'showscheduleddowntime'          => $self->{'showscheduleddowntime'},
+        'services_inherit_hostdowntimes' => $self->{'services_inherit_hostdowntimes'},
     };
     $self->_log('calculate()');
     my $result;
@@ -241,13 +245,10 @@ sub calculate {
         $options->{'calc_all'} = 1;
     }
 
-    #print "calculation availabity with:";
-    #print Dumper($options);
     unless($options->{'calc_all'}) {
         $self->_set_empty_hosts($options, $result);
         $self->_set_empty_services($options, $result);
     }
-    #print Dumper($result);
 
     # which source do we use?
     if(defined $options->{'log_string'}) {
@@ -270,14 +271,55 @@ sub calculate {
     return($result);
 }
 
+
+########################################
+
+=head2 get_condensed_logs
+
+ get_condensed_logs()
+
+returns an array of hashes with the condensed log used for this report
+
+=cut
+
+sub get_condensed_logs {
+    my $self = shift;
+
+    return $self->{'log_output'};
+}
+
+
+########################################
+
+=head2 get_full_logs
+
+ get_full_logs()
+
+returns an array of hashes with the full log used for this report
+
+=cut
+
+sub get_full_logs {
+    my $self = shift;
+
+    return $self->{'full_log_output'};
+}
+
+
 ########################################
 # INTERNAL SUBS
 ########################################
 sub _reset_log_store {
     my $self   = shift;
+
     $self->_log('_reset_log_store()');
+
     undef $self->{'logs'};
     $self->{'logs'} = [];
+
+    undef $self->{'log_output'};
+    $self->{'log_output'} = [];
+
     return 1;
 }
 
@@ -415,9 +457,11 @@ sub _set_from_options {
        or $data->{'type'} eq 'CURRENT HOST STATE'
        or $data->{'type'} eq 'INITIAL HOST STATE'
     ) {
-        $data->{'host_name'} = $self->_strtok($string, ';');
-        $data->{'state'}     = $self->_statestr_to_state($self->_strtok($string, ';'));
-        $data->{'hard'}      = $self->_softstr_to_hard($self->_strtok($string, ';'));
+        $data->{'host_name'}     = $self->_strtok($string, ';');
+        $data->{'state'}         = $self->_statestr_to_state($self->_strtok($string, ';'));
+        $data->{'hard'}          = $self->_softstr_to_hard($self->_strtok($string, ';'));
+                                   $self->_strtok($string, ';');
+        $data->{'plugin_output'} = $self->_strtok($string, ';');
     }
 
     # Service States
@@ -429,6 +473,8 @@ sub _set_from_options {
         $data->{'service_description'} = $self->_strtok($string, ';');
         $data->{'state'}               = $self->_statestr_to_state($self->_strtok($string, ';'));
         $data->{'hard'}                = $self->_softstr_to_hard($self->_strtok($string, ';'));
+                                         $self->_strtok($string, ';');
+        $data->{'plugin_output'}       = $self->_strtok($string, ';');
     }
 
     # Host Downtimes
@@ -467,6 +513,7 @@ sub _set_from_type {
     }
     elsif($data->{'type'} =~ m/Bailing\ out/mx) {
         $data->{'proc_start'} = 0;
+        $data->{'proc_err'}   = 1;
     }
 
     return 1;
@@ -598,6 +645,8 @@ sub _compute_availability_from_log_store {
     my $result  = shift;
     my $options = shift;
     $self->_log('_compute_availability_from_log_store()');
+    $self->_log('_compute_availability_from_log_store() report start: '.(scalar localtime $options->{'start'}));
+    $self->_log('_compute_availability_from_log_store() report end:   '.(scalar localtime $options->{'end'}));
 
     # make sure our logs are sorted by time
     @{$self->{'logs'}} = sort { $a->{'time'} <=> $b->{'time'} } @{$self->{'logs'}};
@@ -615,6 +664,16 @@ sub _compute_availability_from_log_store {
         # end of report reached, insert fake end event
         if($data->{'time'} > $options->{'end'} and $last_time < $options->{'end'}) {
             $self->_insert_fake_end_event($result, $options);
+
+            # set a log entry
+            $self->_add_log_entry(
+                            'options'     => $options,
+                            'report_end'  => 1,
+                            'full_only'   => 1,
+                            'log'         => {
+                                'start'         => $options->{'end'},
+                            },
+            );
         }
 
         # now process the real line
@@ -634,7 +693,18 @@ sub _compute_availability_from_log_store {
     # no end event yet, insert fake end event
     if($last_time < $options->{'end'}) {
         $self->_insert_fake_end_event($result, $options);
+
+        # set a log entry
+        $self->_add_log_entry(
+                        'report_end' => 1,
+                        'options'    => $options,
+                        'full_only'  => 1,
+                        'log'        => {
+                            'start'         => $options->{'end'},
+                        },
+        );
     }
+
 
     return 1;
 }
@@ -650,10 +720,28 @@ sub _process_log_line {
     $self->_log('_process_log_line() at '.(scalar localtime $data->{'time'}));
     $self->_log($data);
 
+    # only hard states?
+    if(!$options->{'includesoftstates'} and defined $data->{'hard'} and $data->{'hard'} != 1) {
+        $self->_log('  -> skipped soft state');
+        return;
+    }
+
+    # skip hosts we dont need
+    if($options->{'calc_all'} == 0 and defined $data->{'host_name'} and !defined $self->{'host_data'}->{$data->{'host_name'}} and !defined $self->{'service_data'}->{$data->{'host_name'}}) {
+        $self->_log('  -> skipped not needed host event');
+        return;
+    }
+
+    # skip services we dont need
+    if($options->{'calc_all'} == 0 and defined $data->{'host_name'} and defined $data->{'service_description'} and !defined $self->{'service_data'}->{$data->{'host_name'}}->{$data->{'service_description'}}) {
+        $self->_log('  -> skipped not needed service event');
+        return;
+    }
+
 
     # process starts / stops?
     if(defined $data->{'proc_start'}) {
-        unless($options->{'assumestatesduringnotrunning'}){
+        unless($options->{'assumestatesduringnotrunning'}) {
             if($data->{'proc_start'}) {
                 # set an event for all services and set state to no_data
                 $self->_log('_process_log_line() process start, inserting fake event for all services');
@@ -665,6 +753,12 @@ sub _process_log_line {
                         $self->_set_service_event($host_name, $service_description, $result, $options, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'}, 'state' => $last_state });
                     }
                 }
+                for my $host_name (keys %{$self->{'host_data'}}) {
+                    my $last_known_state = $self->{'host_data'}->{$host_name}->{'last_known_state'};
+                    my $last_state = STATE_UNSPECIFIED;
+                    $last_state = $last_known_state if defined $last_known_state and $last_known_state >= 0;
+                    $self->_set_host_event($host_name, $result, $options, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'}, 'state' => $last_state });
+                }
             } else {
                 # set an event for all services and set state to not running
                 $self->_log('_process_log_line() process stop, inserting fake event for all services');
@@ -673,51 +767,167 @@ sub _process_log_line {
                         $self->_set_service_event($host_name, $service_description, $result, $options, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'}, 'state' => STATE_NOT_RUNNING });
                     }
                 }
+                for my $host_name (keys %{$self->{'host_data'}}) {
+                    $self->_set_host_event($host_name, $result, $options, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'}, 'state' => STATE_NOT_RUNNING });
+                }
             }
+        }
+        # set a log entry
+        if($data->{'proc_start'}) {
+            $self->_add_log_entry(
+                            'full_only'  => 1,
+                            'options'    => $options,
+                            'log'        => {
+                                'start'         => $data->{'time'},
+                                'type'          => 'PROGRAM (RE)START',
+                                'plugin_output' => 'Program start',
+                                'class'         => 'INDETERMINATE',
+                            },
+            );
+        } else {
+            my $plugin_output = 'Normal program termination';
+            $plugin_output    = 'Abnormal program termination' if defined $data->{'proc_err'};
+            $self->_add_log_entry(
+                            'full_only'  => 1,
+                            'options'    => $options,
+                            'log'        => {
+                                'start'         => $data->{'time'},
+                                'type'          => 'PROGRAM END',
+                                'plugin_output' => $plugin_output,
+                                'class'         => 'INDETERMINATE',
+                            },
+            );
         }
     }
 
     # service events
-    if(defined $data->{'service_description'}) {
+    elsif(defined $data->{'service_description'}) {
         my $service_hist = $self->{'service_data'}->{$data->{'host_name'}}->{$data->{'service_description'}};
 
         if($data->{'type'} eq 'CURRENT SERVICE STATE' or $data->{'type'} eq 'SERVICE ALERT' or $data->{'type'} eq 'INITIAL SERVICE STATE') {
             $self->_set_service_event($data->{'host_name'}, $data->{'service_description'}, $result, $options, $data);
+
+            # set a log entry
+            my $state_text;
+            if(   $data->{'state'} == STATE_OK     )  { $state_text = "OK";       }
+            elsif($data->{'state'} == STATE_WARNING)  { $state_text = "WARNING";  }
+            elsif($data->{'state'} == STATE_UNKNOWN)  { $state_text = "UNKNOWN";  }
+            elsif($data->{'state'} == STATE_CRITICAL) { $state_text = "CRITICAL"; }
+            if(defined $state_text) {
+                my $hard = "";
+                $hard = " (HARD)" if $data->{'hard'};
+                $self->_add_log_entry(
+                            'options'     => $options,
+                            'log' => {
+                                'start'         => $data->{'time'},
+                                'type'          => 'SERVICE '.$state_text.$hard,
+                                'plugin_output' => $data->{'plugin_output'},
+                                'class'         => $state_text,
+                            },
+                );
+            }
         }
         elsif($data->{'type'} eq 'SERVICE DOWNTIME ALERT') {
             undef $data->{'state'}; # we dont know the current state, so make sure it isnt set
             $self->_set_service_event($data->{'host_name'}, $data->{'service_description'}, $result, $options, $data);
+
+            my $start;
+            my $plugin_output;
             if($data->{'start'}) {
+                $start = "START";
+                $plugin_output = 'Start of scheduled downtime';
                 $service_hist->{'in_downtime'} = 1;
             }
             else {
+                $start = "STOP";
+                $plugin_output = 'End of scheduled downtime';
                 $service_hist->{'in_downtime'} = 0;
             }
+
+            # set a log entry
+            $self->_add_log_entry(
+                            'options'     => $options,
+                            'log'         => {
+                                'start'         => $data->{'time'},
+                                'type'          => 'SERVICE DOWNTIME '.$start,
+                                'plugin_output' => $plugin_output,
+                                'class'         => 'INDETERMINATE',
+                            },
+            );
+        }
+        else {
+            $self->_log('  -> unknown log type');
         }
     }
 
     # host events
-    if(defined $data->{'host_name'}) {
+    elsif(defined $data->{'host_name'}) {
         my $host_hist = $self->{'host_data'}->{$data->{'host_name'}};
 
         if($data->{'type'} eq 'CURRENT HOST STATE' or $data->{'type'} eq 'HOST ALERT' or $data->{'type'} eq 'INITIAL HOST STATE') {
             $self->_set_host_event($data->{'host_name'}, $result, $options, $data);
+
+            # set a log entry
+            my $state_text;
+            if(   $data->{'state'} == STATE_UP)          { $state_text = "UP"; }
+            elsif($data->{'state'} == STATE_DOWN)        { $state_text = "DOWN"; }
+            elsif($data->{'state'} == STATE_UNREACHABLE) { $state_text = "UNREACHABLE"; }
+            if(defined $state_text) {
+                my $hard = "";
+                $hard = " (HARD)" if $data->{'hard'};
+                $self->_add_log_entry(
+                            'options'     => $options,
+                            'log' => {
+                                'start'         => $data->{'time'},
+                                'type'          => 'HOST '.$state_text.$hard,
+                                'plugin_output' => $data->{'plugin_output'},
+                                'class'         => $state_text,
+                            },
+                );
+            }
         }
         elsif($data->{'type'} eq 'HOST DOWNTIME ALERT') {
+            my $last_state_time = $host_hist->{'last_state_time'};
 
-            $self->_log('_process_log_line() hostdowntime, inserting fake event for all services');
-            # set an event for all services
-            for my $service_description (keys %{$self->{'service_data'}->{$data->{'host_name'}}}) {
-                $self->_set_service_event($data->{'host_name'}, $service_description, $result, $options, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'} });
+            if($options->{'services_inherit_hostdowntimes'}) {
+                $self->_log('_process_log_line() hostdowntime, inserting fake event for all services');
+                # set an event for all services
+                for my $service_description (keys %{$self->{'service_data'}->{$data->{'host_name'}}}) {
+                    $last_state_time = $self->{'service_data'}->{$data->{'host_name'}}->{$service_description}->{'last_state_time'};
+                    $self->_set_service_event($data->{'host_name'}, $service_description, $result, $options, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'} });
+                }
             }
 
+            my $start;
+            my $plugin_output;
             if($data->{'start'}) {
+                $start = "START";
+                $plugin_output = 'Start of scheduled downtime';
                 $host_hist->{'in_downtime'} = 1;
             }
             else {
+                $start = "STOP";
+                $plugin_output = 'End of scheduled downtime';
                 $host_hist->{'in_downtime'} = 0;
             }
+
+            # set a log entry
+            $self->_add_log_entry(
+                            'options'     => $options,
+                            'log'         => {
+                                'start'         => $data->{'time'},
+                                'type'          => 'HOST DOWNTIME '.$start,
+                                'plugin_output' => $plugin_output,
+                                'class'         => 'INDETERMINATE',
+                            },
+            );
         }
+        else {
+            $self->_log('  -> unknown log type');
+        }
+    }
+    else {
+        $self->_log('  -> unknown log type');
     }
 
     return 1;
@@ -749,7 +959,7 @@ sub _set_service_event {
             if($service_hist->{'last_state'} == STATE_OK) {
                 $self->_log('_set_service_event() ok + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $service_data->{'time_ok'} += $diff;
-                if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
+                if($service_hist->{'in_downtime'} or ($options->{'services_inherit_hostdowntimes'} and $host_hist->{'in_downtime'})) {
                     $self->_log('_set_service_event() ok sched + '.$diff.' seconds');
                     $service_data->{'scheduled_time_ok'} += $diff
                 }
@@ -759,7 +969,7 @@ sub _set_service_event {
             elsif($service_hist->{'last_state'} == STATE_WARNING) {
                 $self->_log('_set_service_event() warning + '.$diff.' seconds');
                 $service_data->{'time_warning'} += $diff;
-                if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
+                if($service_hist->{'in_downtime'} or ($options->{'services_inherit_hostdowntimes'} and $host_hist->{'in_downtime'})) {
                     $self->_log('_set_service_event() warning sched + '.$diff.' seconds');
                     $service_data->{'scheduled_time_warning'} += $diff
                 }
@@ -769,7 +979,7 @@ sub _set_service_event {
             elsif($service_hist->{'last_state'} == STATE_CRITICAL) {
                 $self->_log('_set_service_event() critical + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $service_data->{'time_critical'} += $diff;
-                if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
+                if($service_hist->{'in_downtime'} or ($options->{'services_inherit_hostdowntimes'} and $host_hist->{'in_downtime'})) {
                     $self->_log('_set_service_event() critical sched + '.$diff.' seconds');
                     $service_data->{'scheduled_time_critical'} += $diff
                 }
@@ -779,7 +989,7 @@ sub _set_service_event {
             elsif($service_hist->{'last_state'} == STATE_UNKNOWN) {
                 $self->_log('_set_service_event() unknown + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $service_data->{'time_unknown'} += $diff;
-                if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
+                if($service_hist->{'in_downtime'} or ($options->{'services_inherit_hostdowntimes'} and $host_hist->{'in_downtime'})) {
                     $self->_log('_set_service_event() unknown sched + '.$diff.' seconds');
                     $service_data->{'scheduled_time_unknown'} += $diff
                 }
@@ -789,7 +999,7 @@ sub _set_service_event {
             elsif($service_hist->{'last_state'} == STATE_UNSPECIFIED) {
                 $self->_log('_set_service_event() indeterminate + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $service_data->{'time_indeterminate_nodata'} += $diff;
-                if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
+                if($service_hist->{'in_downtime'} or ($options->{'services_inherit_hostdowntimes'} and $host_hist->{'in_downtime'})) {
                     $self->_log('_set_service_event() indeterminate sched + '.$diff.' seconds');
                     $service_data->{'scheduled_time_indeterminate'} += $diff
                 }
@@ -800,6 +1010,7 @@ sub _set_service_event {
                 $self->_log('_set_service_event() not_running + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $service_data->{'time_indeterminate_notrunning'} += $diff;
             }
+
         }
     }
 
@@ -810,6 +1021,7 @@ sub _set_service_event {
 
         $service_hist->{'last_known_state'} = $data->{'state'} if $data->{'state'} >= 0;
     }
+
     $service_hist->{'last_state_time'} = $data->{'time'};
 
     return 1;
@@ -834,9 +1046,11 @@ sub _set_host_event {
         # we got a last state?
         if(defined $host_hist->{'last_state'}) {
             my $diff = $data->{'time'} - $host_hist->{'last_state_time'};
+            my $state_text;
 
             # up
             if($host_hist->{'last_state'} == STATE_UP) {
+                $state_text = "UP";
                 $self->_log('_set_host_event() up + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $host_data->{'time_up'} += $diff;
                 if($host_hist->{'in_downtime'}) {
@@ -847,6 +1061,7 @@ sub _set_host_event {
 
             # down
             elsif($host_hist->{'last_state'} == STATE_DOWN) {
+                $state_text = "DOWN";
                 $self->_log('_set_host_event() down + '.$diff.' seconds');
                 $host_data->{'time_down'} += $diff;
                 if($host_hist->{'in_downtime'}) {
@@ -857,6 +1072,7 @@ sub _set_host_event {
 
             # unreachable
             elsif($host_hist->{'last_state'} == STATE_UNREACHABLE) {
+                $state_text = "UNREACHABLE";
                 $self->_log('_set_host_event() unreachable + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $host_data->{'time_unreachable'} += $diff;
                 if($host_hist->{'in_downtime'}) {
@@ -879,6 +1095,21 @@ sub _set_host_event {
             elsif($host_hist->{'last_state'} == STATE_NOT_RUNNING) {
                 $self->_log('_set_host_event() not_running + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $host_data->{'time_indeterminate_notrunning'} += $diff;
+            }
+
+            # set a log entry
+            if(defined $state_text) {
+                my $hard = "";
+                $hard = " (HARD)" if $data->{'hard'};
+                $self->_add_log_entry(
+                            'options'     => $options,
+                            'log'         => {
+                                'start'         => $data->{'time'},
+                                'type'          => 'HOST '.$state_text.$hard,
+                                'plugin_output' => $data->{'plugin_output'},
+                                'class'         => $state_text,
+                            },
+                );
             }
         }
     }
@@ -1028,13 +1259,15 @@ sub _set_default_options {
     my $self    = shift;
     my $options = shift;
 
-    $options->{'backtrack'}                    = 4             unless defined $options->{'backtrack'};
-    $options->{'assumeinitialstates'}          = 'yes'         unless defined $options->{'assumeinitialstates'};
-    $options->{'assumestateretention'}         = 'yes'         unless defined $options->{'assumestateretention'};
-    $options->{'assumestatesduringnotrunning'} = 'yes'         unless defined $options->{'assumestatesduringnotrunning'};
-    $options->{'includesoftstates'}            = 'no'          unless defined $options->{'includesoftstates'};
-    $options->{'initialassumedhoststate'}      = 'unspecified' unless defined $options->{'initialassumedhoststate'};
-    $options->{'initialassumedservicestate'}   = 'unspecified' unless defined $options->{'initialassumedservicestate'};
+    $options->{'backtrack'}                      = 4             unless defined $options->{'backtrack'};
+    $options->{'assumeinitialstates'}            = 'yes'         unless defined $options->{'assumeinitialstates'};
+    $options->{'assumestateretention'}           = 'yes'         unless defined $options->{'assumestateretention'};
+    $options->{'assumestatesduringnotrunning'}   = 'yes'         unless defined $options->{'assumestatesduringnotrunning'};
+    $options->{'includesoftstates'}              = 'no'          unless defined $options->{'includesoftstates'};
+    $options->{'initialassumedhoststate'}        = 'unspecified' unless defined $options->{'initialassumedhoststate'};
+    $options->{'initialassumedservicestate'}     = 'unspecified' unless defined $options->{'initialassumedservicestate'};
+    $options->{'showscheduleddowntime'}          = 'yes'         unless defined $options->{'showscheduleddowntime'};
+    $options->{'services_inherit_hostdowntimes'} = 'no'          unless defined $options->{'services_inherit_hostdowntimes'};
 
     return $options;
 }
@@ -1052,7 +1285,13 @@ sub _verify_options {
     }
 
     # our yes no options
-    for my $yes_no (qw/assumeinitialstates assumestateretention assumestatesduringnotrunning includesoftstates/) {
+    for my $yes_no (qw/assumeinitialstates
+                       assumestateretention
+                       assumestatesduringnotrunning
+                       includesoftstates
+                       showscheduleddowntime
+                       services_inherit_hostdowntimes
+                      /) {
         if(defined $options->{$yes_no}) {
             if(lc $options->{$yes_no} eq 'yes') {
                 $options->{$yes_no} = YES;
@@ -1113,6 +1352,51 @@ sub _verify_options {
     }
 
     return $options;
+}
+
+########################################
+sub _add_log_entry {
+    my $self    = shift;
+    my %opts    = @_;
+
+    $self->_log('_add_log_entry()');
+
+    if(defined $self->{'last_log_entry'}) {
+        my $last_options   = $self->{'last_log_entry'};
+        my $last_log_entry = $last_options->{'log'};
+
+        # inside of report time?
+        if(    $opts{'options'}->{'start'} <  $last_log_entry->{'start'}
+           and $opts{'options'}->{'end'}   >= $last_log_entry->{'start'}
+          ) {
+            $self->_log('  -> added log to stack');
+            $last_log_entry->{'end'}      = $opts{'log'}->{'start'};
+            $last_log_entry->{'duration'} = $self->_duration($opts{'log'}->{'start'} - $last_log_entry->{'start'});
+
+
+            if(defined $opts{'report_end'} and $opts{'report_end'} == 1) {
+                $last_log_entry->{'duration'} = $last_log_entry->{'duration'}."+";
+            }
+
+            $last_log_entry->{'end'}   = scalar localtime $last_log_entry->{'end'};
+            $last_log_entry->{'start'} = scalar localtime $last_log_entry->{'start'};
+
+
+            $self->_log('  -> added from stack: '.Dumper($last_log_entry));
+            if(!defined $last_options->{'full_only'} or $last_options->{'full_only'} == 0) {
+                push @{$self->{'log_output'}}, $last_log_entry;
+            }
+            push @{$self->{'full_log_output'}}, $last_log_entry;
+        }
+        else {
+            $self->_log('  -> discard');
+        }
+        undef $self->{'last_log_entry'};
+    }
+
+    $self->{'last_log_entry'} = \%opts;
+
+    return 1;
 }
 
 ########################################
