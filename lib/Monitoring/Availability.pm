@@ -5,6 +5,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 use Carp;
+use POSIX qw(strftime);
 
 our $VERSION = '0.05_3';
 
@@ -74,6 +75,10 @@ Go back this amount of days to find initial states, default: 4
 
 Services will inherit downtimes from hosts, default: no
 
+=item timeformat
+
+Time format for the log output, default: %s
+
 =item verbose
 
 verbose mode
@@ -98,6 +103,11 @@ use constant {
     STATE_WARNING       =>  1,
     STATE_CRITICAL      =>  2,
     STATE_UNKNOWN       =>  3,
+
+    START_NORMAL        =>  1,
+    START_RESTART       =>  2,
+    STOP_NORMAL         =>  0,
+    STOP_ERROR          => -1,
 };
 
 sub new {
@@ -108,6 +118,7 @@ sub new {
     my $self = {
         'verbose'                        => 0,       # enable verbose output
         'logger'                         => undef,   # logger object used for verbose output
+        'timeformat'                     => undef,
         'rpttimeperiod'                  => undef,
         'assumeinitialstates'            => undef,
         'assumestateretention'           => undef,
@@ -208,6 +219,7 @@ sub calculate {
         'backtrack'                      => $self->{'backtrack'},
         'showscheduleddowntime'          => $self->{'showscheduleddowntime'},
         'services_inherit_hostdowntimes' => $self->{'services_inherit_hostdowntimes'},
+        'timeformat'                     => $self->{'timeformat'},
     };
     $self->_log('calculate()');
     my $result;
@@ -501,19 +513,18 @@ sub _set_from_type {
 
     # program starts
     if($data->{'type'} =~ m/\ starting\.\.\./mx) {
-        $data->{'proc_start'} = 1;
+        $data->{'proc_start'} = START_NORMAL;
     }
     elsif($data->{'type'} =~ m/\ restarting\.\.\./mx) {
-        $data->{'proc_start'} = 1;
+        $data->{'proc_start'} = START_RESTART;
     }
 
     # program stops
     elsif($data->{'type'} =~ m/shutting\ down\.\.\./mx) {
-        $data->{'proc_start'} = 0;
+        $data->{'proc_start'} = STOP_NORMAL;
     }
     elsif($data->{'type'} =~ m/Bailing\ out/mx) {
-        $data->{'proc_start'} = 0;
-        $data->{'proc_err'}   = 1;
+        $data->{'proc_start'} = STOP_ERROR;
     }
 
     return 1;
@@ -700,7 +711,7 @@ sub _compute_availability_from_log_store {
                         'options'    => $options,
                         'full_only'  => 1,
                         'log'        => {
-                            'start'         => $options->{'end'},
+                            'start' => $options->{'end'},
                         },
         );
     }
@@ -742,7 +753,7 @@ sub _process_log_line {
     # process starts / stops?
     if(defined $data->{'proc_start'}) {
         unless($options->{'assumestatesduringnotrunning'}) {
-            if($data->{'proc_start'}) {
+            if($data->{'proc_start'} == START_NORMAL or $data->{'proc_start'} == START_RESTART) {
                 # set an event for all services and set state to no_data
                 $self->_log('_process_log_line() process start, inserting fake event for all services');
                 for my $host_name (keys %{$self->{'service_data'}}) {
@@ -757,36 +768,38 @@ sub _process_log_line {
                     my $last_known_state = $self->{'host_data'}->{$host_name}->{'last_known_state'};
                     my $last_state = STATE_UNSPECIFIED;
                     $last_state = $last_known_state if defined $last_known_state and $last_known_state >= 0;
-                    $self->_set_host_event($host_name, $result, $options, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'}, 'state' => $last_state });
+                    $self->_set_host_event($host_name, $result, $options, { 'time' => $data->{'time'}, 'state' => $last_state });
                 }
             } else {
                 # set an event for all services and set state to not running
                 $self->_log('_process_log_line() process stop, inserting fake event for all services');
                 for my $host_name (keys %{$self->{'service_data'}}) {
                     for my $service_description (keys %{$self->{'service_data'}->{$host_name}}) {
-                        $self->_set_service_event($host_name, $service_description, $result, $options, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'}, 'state' => STATE_NOT_RUNNING });
+                        $self->_set_service_event($host_name, $service_description, $result, $options, { 'time' => $data->{'time'}, 'state' => STATE_NOT_RUNNING });
                     }
                 }
                 for my $host_name (keys %{$self->{'host_data'}}) {
-                    $self->_set_host_event($host_name, $result, $options, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'}, 'state' => STATE_NOT_RUNNING });
+                    $self->_set_host_event($host_name, $result, $options, { 'time' => $data->{'time'}, 'state' => STATE_NOT_RUNNING });
                 }
             }
         }
         # set a log entry
-        if($data->{'proc_start'}) {
+        if($data->{'proc_start'} == START_NORMAL or $data->{'proc_start'} == START_RESTART) {
+            my $plugin_output = 'Program start';
+               $plugin_output = 'Program restart' if $data->{'proc_start'} == START_RESTART;
             $self->_add_log_entry(
                             'full_only'  => 1,
                             'options'    => $options,
                             'log'        => {
                                 'start'         => $data->{'time'},
                                 'type'          => 'PROGRAM (RE)START',
-                                'plugin_output' => 'Program start',
+                                'plugin_output' => $plugin_output,
                                 'class'         => 'INDETERMINATE',
                             },
             );
         } else {
             my $plugin_output = 'Normal program termination';
-            $plugin_output    = 'Abnormal program termination' if defined $data->{'proc_err'};
+            $plugin_output    = 'Abnormal program termination' if $data->{'proc_start'} == STOP_ERROR;
             $self->_add_log_entry(
                             'full_only'  => 1,
                             'options'    => $options,
@@ -839,7 +852,7 @@ sub _process_log_line {
                 $service_hist->{'in_downtime'} = 1;
             }
             else {
-                $start = "STOP";
+                $start = "END";
                 $plugin_output = 'End of scheduled downtime';
                 $service_hist->{'in_downtime'} = 0;
             }
@@ -1196,7 +1209,7 @@ sub _insert_fake_start_event {
                 'hard'                => 1,
                 'state'               => $last_service_state,
             };
-            $self->_process_log_line($result, $options, $fakedata);
+            $self->_set_service_event($host, $service, $result, $options, $fakedata);
         }
     }
 
@@ -1212,7 +1225,7 @@ sub _insert_fake_start_event {
             'hard'                => 1,
             'state'               => $last_host_state,
         };
-        $self->_process_log_line($result, $options, $fakedata);
+        $self->_set_host_event($host, $result, $options, $fakedata);
     }
 
     return 1;
@@ -1236,7 +1249,7 @@ sub _insert_fake_end_event {
                 'hard'                => 1,
                 'state'               => $self->{'service_data'}->{$host}->{$service}->{'last_state'},
             };
-            $self->_process_log_line($result, $options, $fakedata);
+            $self->_set_service_event($host, $service, $result, $options, $fakedata);
         }
     }
 
@@ -1248,7 +1261,7 @@ sub _insert_fake_end_event {
             'hard'                => 1,
             'state'               => $self->{'host_data'}->{$host}->{'last_state'},
         };
-        $self->_process_log_line($result, $options, $fakedata);
+        $self->_set_host_event($host, $result, $options, $fakedata);
     }
 
     return 1;
@@ -1268,6 +1281,7 @@ sub _set_default_options {
     $options->{'initialassumedservicestate'}     = 'unspecified' unless defined $options->{'initialassumedservicestate'};
     $options->{'showscheduleddowntime'}          = 'yes'         unless defined $options->{'showscheduleddowntime'};
     $options->{'services_inherit_hostdowntimes'} = 'no'          unless defined $options->{'services_inherit_hostdowntimes'};
+    $options->{'timeformat'}                     = '%s'          unless defined $options->{'timeformat'};
 
     return $options;
 }
@@ -1359,7 +1373,8 @@ sub _add_log_entry {
     my $self    = shift;
     my %opts    = @_;
 
-    $self->_log('_add_log_entry()');
+    my @caller = caller;
+    $self->_log('_add_log_entry()'.Dumper(\@caller));
 
     if(defined $self->{'last_log_entry'}) {
         my $last_options   = $self->{'last_log_entry'};
@@ -1378,8 +1393,10 @@ sub _add_log_entry {
                 $last_log_entry->{'duration'} = $last_log_entry->{'duration'}."+";
             }
 
-            $last_log_entry->{'end'}   = scalar localtime $last_log_entry->{'end'};
-            $last_log_entry->{'start'} = scalar localtime $last_log_entry->{'start'};
+            if($opts{'options'}->{'timeformat'} ne '%s') {
+                $last_log_entry->{'end'}   = strftime $opts{'options'}->{'timeformat'}, localtime($last_log_entry->{'end'});
+                $last_log_entry->{'start'} = strftime $opts{'options'}->{'timeformat'}, localtime($last_log_entry->{'start'});
+            }
 
 
             $self->_log('  -> added from stack: '.Dumper($last_log_entry));

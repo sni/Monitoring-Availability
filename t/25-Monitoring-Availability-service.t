@@ -29,7 +29,7 @@ my $expected = {
                 'scheduled_time_warning'        => 0,
                 'scheduled_time_unknown'        => 0,
                 'scheduled_time_critical'       => 0,
-                'scheduled_time_indeterminate'  => 0,
+                'scheduled_time_indeterminate'  => 55,
 
                 'time_indeterminate_nodata'     => 85733,
                 'time_indeterminate_notrunning' => 0,
@@ -88,24 +88,22 @@ my $ma = Monitoring::Availability->new(
     'initialassumedhoststate'       => 'unspecified',
     'initialassumedservicestate'    => 'unspecified',
     'showscheduleddowntime'         => 'yes',
+    'timeformat'                    => '%Y-%m-%d %H:%M:%S',
 );
 isa_ok($ma, 'Monitoring::Availability', 'create new Monitoring::Availability object');
-TODO: {
-    local $TODO = "not implemented yet";
-    my $result = $ma->calculate(
-        'log_string'                    => $logs,
-        'services'                      => [{'host' => 'n0_test_host_000', 'service' => 'n0_test_pending_01'}],
-        'start'                         => 1264026307,
-        'end'                           => 1264112707,
-    );
-    is_deeply($result, $expected, 'service availability') or diag("got:\n".Dumper($result)."\nbut expected:\n".Dumper($expected));
+my $result = $ma->calculate(
+    'log_string'                    => $logs,
+    'services'                      => [{'host' => 'n0_test_host_000', 'service' => 'n0_test_pending_01'}],
+    'start'                         => 1264026307,
+    'end'                           => 1264112707,
+);
+is_deeply($result, $expected, 'service availability') or diag("got:\n".Dumper($result)."\nbut expected:\n".Dumper($expected));
 
-    my $condensed_logs = $ma->get_condensed_logs();
-    is_deeply($condensed_logs, $expected_condensed_log, 'condensed logs') or diag("got:\n".Dumper($condensed_logs)."\nbut expected:\n".Dumper($expected_condensed_log));
+my $condensed_logs = $ma->get_condensed_logs();
+is_deeply($condensed_logs, $expected_condensed_log, 'condensed logs') or diag("got:\n".Dumper($condensed_logs)."\nbut expected:\n".Dumper($expected_condensed_log));
 
-    my $full_logs = $ma->get_full_logs();
-    is_deeply($full_logs, $expected_full_log, 'full logs') or diag("got:\n".Dumper($full_logs)."\nbut expected:\n".Dumper($expected_full_log));
-};
+my $full_logs = $ma->get_full_logs();
+is_deeply($full_logs, $expected_full_log, 'full logs') or diag("got:\n".Dumper($full_logs)."\nbut expected:\n".Dumper($expected_full_log));
 
 __DATA__
 [1264111515] Nagios 3.2.0 starting... (PID=31189)

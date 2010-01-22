@@ -27,7 +27,7 @@ my $livestatus_logs= [
 my $expected = [
     {'plugin_output' => 'mo OK: random hostcheck ok','service_description' => '','options' => 'i0test_router_19;UP;HARD;1;mo OK: random hostcheck ok','time' => '1263423600','state' => 0,'host_name' => 'i0test_router_19','type' => 'CURRENT HOST STATE','class' => '6','hard' => 1},
     {'plugin_output' => 'mo WARNING: warning servicecheck','service_description' => 'i0test_warning_18','options' => 'i0test_host_199;i0test_warning_18;WARNING;HARD;3;mo WARNING: warning servicecheck','time' => '1263423600','state' => 1,'host_name' => 'i0test_host_199','type' => 'CURRENT SERVICE STATE','class' => '6','hard' => 1},
-    {'options' => '','time' => '1261184172','class' => '2','type' => 'Caught SIGHUP, restarting...','proc_start' => 1,'state' => '0'},
+    {'options' => '','time' => '1261184172','class' => '2','type' => 'Caught SIGHUP, restarting...','proc_start' => 2,'state' => '0'},
     {'options' => '','time' => '1263650899','class' => '2','type' => 'Caught SIGTERM, shutting down...','proc_start' => 0,'state' => '0'},
     {'plugin_output' => 'mo DOWN: random hostcheck: parent host down','service_description' => '','options' => 'i0test_host_198;DOWN;HARD;1;mo DOWN: random hostcheck: parent host down','time' => '1261687372','state' => 1,'host_name' => 'i0test_host_198','type' => 'HOST ALERT','class' => '1','hard' => 1},
     {'options' => 'localhost;STARTED; Host has entered a period of scheduled downtime','time' => '1262850822','host_name' => 'localhost','class' => '1','type' => 'HOST DOWNTIME ALERT','start' => 1,'state' => '0'},
