@@ -6,6 +6,11 @@ use strict;
 use Test::More tests => 18;
 use Data::Dumper;
 
+BEGIN {
+    require 't/00_test_utils.pm';
+    import TestUtils;
+}
+
 use_ok('Monitoring::Availability');
 
 #########################
@@ -54,25 +59,6 @@ my $expected_full_log = [
 ];
 
 #########################
-# create a logger object if we have log4perl installed
-my $logger;
-eval {
-    if(defined $ENV{'TEST_LOG'}) {
-        use Log::Log4perl qw(:easy);
-        Log::Log4perl->easy_init($DEBUG);
-        Log::Log4perl->init(\ q{
-            log4perl.logger                    = DEBUG, Screen
-            log4perl.appender.Screen           = Log::Log4perl::Appender::ScreenColoredLevels
-            log4perl.appender.Screen.stderr    = 1
-            log4perl.appender.Screen.Threshold = DEBUG
-            log4perl.appender.Screen.layout    = Log::Log4perl::Layout::PatternLayout
-            log4perl.appender.Screen.layout.ConversionPattern = [%d] %m%n
-        });
-        $logger = get_logger();
-    }
-};
-
-#########################
 my $ma = Monitoring::Availability->new(
     'verbose'                       => 1,
     'logger'                        => $logger,
@@ -91,29 +77,17 @@ my $result = $ma->calculate(
     'end'                           => 1263498850,
 );
 TODO: {
-    local $TODO = 'not yet implemented';
+    $TODO = 'not yet implemented';
     is_deeply($result, $expected, 'host with downtime') or diag("got:\n".Dumper($result)."\nbut expected:\n".Dumper($expected));
 
 
     my $condensed_logs = $ma->get_condensed_logs();
-    check_one_by_one($expected_condensed_log, $condensed_logs, 'condensed logs');
+    TestUtils::check_array_one_by_one($expected_condensed_log, $condensed_logs, 'condensed logs');
 
     my $full_logs = $ma->get_full_logs();
-    check_one_by_one($expected_full_log, $full_logs, 'full logs');
+    TestUtils::check_array_one_by_one($expected_full_log, $full_logs, 'full logs');
+    undef $TODO;
 };
-
-#########################
-sub check_one_by_one {
-    my $exp  = shift;
-    my $got  = shift;
-    my $name = shift;
-
-    for(my $x = 0; $x <= scalar @{$exp}; $x++) {
-        is_deeply($got->[$x], $exp->[$x], $name.' '.$x) or diag("got:\n".Dumper($got->[0])."\nbut expected:\n".Dumper($exp->[0]));
-    }
-    return 1;
-}
-#########################
 
 __DATA__
 [1262962252] Nagios 3.2.0 starting... (PID=7873)

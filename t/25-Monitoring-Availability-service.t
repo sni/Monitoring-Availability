@@ -3,8 +3,13 @@
 #########################
 
 use strict;
-use Test::More tests => 5;
+use Test::More tests => 18;
 use Data::Dumper;
+
+BEGIN {
+    require 't/00_test_utils.pm';
+    import TestUtils;
+}
 
 use_ok('Monitoring::Availability');
 
@@ -58,25 +63,6 @@ my $expected_full_log = [
 ];
 
 #########################
-# create a logger object if we have log4perl installed
-my $logger;
-eval {
-    if(defined $ENV{'TEST_LOG'}) {
-        use Log::Log4perl qw(:easy);
-        Log::Log4perl->easy_init($DEBUG);
-        Log::Log4perl->init(\ q{
-            log4perl.logger                    = DEBUG, Screen
-            log4perl.appender.Screen           = Log::Log4perl::Appender::ScreenColoredLevels
-            log4perl.appender.Screen.stderr    = 1
-            log4perl.appender.Screen.Threshold = DEBUG
-            log4perl.appender.Screen.layout    = Log::Log4perl::Layout::PatternLayout
-            log4perl.appender.Screen.layout.ConversionPattern = [%d] %m%n
-        });
-        $logger = get_logger();
-    }
-};
-
-#########################
 # avail.cgi?host=n0_test_host_000&service=n0_test_pending_01&t1=1264026307&t2=1264112707&backtrack=4&assumestateretention=yes&assumeinitialstates=yes&assumestatesduringnotrunning=yes&initialassumedhoststate=0&initialassumedservicestate=0&show_log_entries&showscheduleddowntime=yes
 my $ma = Monitoring::Availability->new(
     'verbose'                       => 1,
@@ -100,10 +86,10 @@ my $result = $ma->calculate(
 is_deeply($result, $expected, 'service availability') or diag("got:\n".Dumper($result)."\nbut expected:\n".Dumper($expected));
 
 my $condensed_logs = $ma->get_condensed_logs();
-is_deeply($condensed_logs, $expected_condensed_log, 'condensed logs') or diag("got:\n".Dumper($condensed_logs)."\nbut expected:\n".Dumper($expected_condensed_log));
+TestUtils::check_array_one_by_one($expected_condensed_log, $condensed_logs, 'condensed logs');
 
 my $full_logs = $ma->get_full_logs();
-is_deeply($full_logs, $expected_full_log, 'full logs') or diag("got:\n".Dumper($full_logs)."\nbut expected:\n".Dumper($expected_full_log));
+TestUtils::check_array_one_by_one($expected_full_log, $full_logs, 'full logs');
 
 __DATA__
 [1264111515] Nagios 3.2.0 starting... (PID=31189)
