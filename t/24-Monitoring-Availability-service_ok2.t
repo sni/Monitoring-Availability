@@ -3,7 +3,7 @@
 #########################
 
 use strict;
-use Test::More tests => 21;
+use Test::More tests => 63;
 use Data::Dumper;
 
 BEGIN {
@@ -87,11 +87,56 @@ my $result = $ma->calculate(
 is_deeply($result, $expected, 'ok service') or diag("got:\n".Dumper($result)."\nbut expected:\n".Dumper($expected));
 
 my $condensed_logs = $ma->get_condensed_logs();
-TestUtils::check_array_one_by_one($expected_log, $condensed_logs, 'condensed logs', { join => 1 });
+TestUtils::check_array_one_by_one($expected_log, $condensed_logs, 'condensed logs');
 
 my $full_logs = $ma->get_full_logs();
 TestUtils::check_array_one_by_one($expected_full_log, $full_logs, 'full logs');
 
+
+#################################
+# now check with initial assumed state "unknown"
+$result = $ma->calculate(
+    'log_string'                    => $logs,
+    'services'                      => [{'host' => 'n0_test_host_000', 'service' => 'n0_test_random_04'}],
+    'start'                         => 1263417384,
+    'end'                           => 1264022184,
+    'initialassumedservicestate'    => 'unknown',
+);
+is_deeply($result, $expected, 'ok service with initial unknown') or diag("got:\n".Dumper($result)."\nbut expected:\n".Dumper($expected));
+
+my $additional_logs = [
+    { 'start' => '2010-01-08 15:50:51', 'end' => '2010-01-08 15:50:52', 'duration' => '0d 0h 0m 1s', 'type' => 'SERVICE UNKNOWN (HARD)', 'plugin_output' => 'First Service State Assumed (Faked Log Entry)', 'class' => 'UNKNOWN' },
+];
+$condensed_logs = $ma->get_condensed_logs();
+TestUtils::check_array_one_by_one([@{$additional_logs}, @{$expected_log}], $condensed_logs, 'condensed logs with initial unknown');
+
+$full_logs = $ma->get_full_logs();
+TestUtils::check_array_one_by_one([@{$additional_logs}, @{$expected_full_log}], $full_logs, 'full logs with initial unknown');
+
+
+#################################
+# now check with initial state "current"
+$result = $ma->calculate(
+    'log_string'                    => $logs,
+    'services'                      => [{'host' => 'n0_test_host_000', 'service' => 'n0_test_random_04'}],
+    'start'                         => 1263417384,
+    'end'                           => 1264022184,
+    'initialassumedservicestate'    => 'current',
+    'initial_states'                => { 'services' => { 'n0_test_host_000' => { 'n0_test_random_04' => 'warning' }}},
+);
+is_deeply($result, $expected, 'ok service with initial current') or diag("got:\n".Dumper($result)."\nbut expected:\n".Dumper($expected));
+
+$additional_logs = [
+    { 'start' => '2010-01-08 15:50:51', 'end' => '2010-01-08 15:50:52', 'duration' => '0d 0h 0m 1s', 'type' => 'SERVICE WARNING (HARD)', 'plugin_output' => 'First Service State Assumed (Faked Log Entry)', 'class' => 'WARNING' },
+];
+$condensed_logs = $ma->get_condensed_logs();
+TestUtils::check_array_one_by_one([@{$additional_logs}, @{$expected_log}], $condensed_logs, 'condensed logs with initial unknown');
+
+$full_logs = $ma->get_full_logs();
+TestUtils::check_array_one_by_one([@{$additional_logs}, @{$expected_full_log}], $full_logs, 'full logs with initial unknown');
+
+
+#################################
 __DATA__
 [1262962252] Nagios 3.2.0 starting... (PID=7873)
 [1262991600] CURRENT SERVICE STATE: n0_test_host_000;n0_test_random_04;OK;HARD;1;n0_test_host_000 (checked by mo) REVOVERED: random n0_test_random_04 recovered
