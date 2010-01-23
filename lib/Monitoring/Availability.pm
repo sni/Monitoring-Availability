@@ -8,7 +8,7 @@ use Carp;
 use POSIX qw(strftime);
 use Monitoring::Availability::Logs;
 
-our $VERSION = '0.05_4';
+our $VERSION = '0.06';
 
 
 =head1 NAME
