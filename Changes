@@ -5,6 +5,7 @@ Revision history for Perl extension Monitoring::Availability.
     - changed the way of settings options
     - added new option services_inherit_hostdowntimes
     - added new option timeformat which is used for log output
+    - moved logfile parsing to extra module
 
 0.04  Mon Jan 18 08:06:59 CET 2010
     - added message when passing wrong services

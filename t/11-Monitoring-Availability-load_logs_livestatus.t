@@ -6,7 +6,7 @@ use strict;
 use Test::More tests => 4;
 use Data::Dumper;
 
-use_ok('Monitoring::Availability');
+use_ok('Monitoring::Availability::Logs');
 
 #########################
 
@@ -38,8 +38,8 @@ my $expected = [
     {'plugin_output' => 'mo REVOVERED: random servicecheck recovered','service_description' => 'i0test_random_18','options' => 'test_contact;i0test_host_180;i0test_random_18;OK;notify-service;mo REVOVERED: random servicecheck recovered','time' => '1261685289','state' => '0','host_name' => 'i0test_host_180','type' => 'SERVICE NOTIFICATION','class' => '3'}
 ];
 
-my $ma = Monitoring::Availability->new();
-isa_ok($ma, 'Monitoring::Availability', 'create new Monitoring::Availability object');
-my $rc = $ma->_store_logs_from_livestatus($livestatus_logs);
+my $mal = Monitoring::Availability::Logs->new();
+isa_ok($mal, 'Monitoring::Availability::Logs', 'create new Monitoring::Availability::Logs object');
+my $rc = $mal->_store_logs_from_livestatus($livestatus_logs);
 is($rc, 1, '_store_logs_from_livestatus rc');
-is_deeply($ma->{'logs'}, $expected, 'sample 1 result');
+is_deeply($mal->{'logs'}, $expected, 'sample 1 result');

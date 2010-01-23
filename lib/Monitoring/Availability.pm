@@ -6,8 +6,9 @@ use warnings;
 use Data::Dumper;
 use Carp;
 use POSIX qw(strftime);
+use Monitoring::Availability::Logs;
 
-our $VERSION = '0.05_3';
+our $VERSION = '0.05_4';
 
 
 =head1 NAME
@@ -112,7 +113,6 @@ use constant {
 
 sub new {
     my $class = shift;
-    unshift(@_, "peer") if scalar @_ == 1;
     my(%options) = @_;
 
     my $self = {
@@ -266,21 +266,16 @@ sub calculate {
         $self->_set_empty_services($result);
     }
 
-    # which source do we use?
-    if(defined $self->{'report_options'}->{'log_string'}) {
-        $self->_store_logs_from_string($self->{'report_options'}->{'log_string'});
-    }
-    if(defined $self->{'report_options'}->{'log_file'}) {
-        $self->_store_logs_from_file($self->{'report_options'}->{'log_file'});
-    }
-    if(defined $self->{'report_options'}->{'log_dir'}) {
-        $self->_store_logs_from_dir($self->{'report_options'}->{'log_dir'});
-    }
-    if(defined $self->{'report_options'}->{'log_livestatus'}) {
-        $self->_store_logs_from_livestatus($self->{'report_options'}->{'log_livestatus'});
-    }
+    # read in logs
+    my $mal = Monitoring::Availability::Logs->new(
+        'log_string'        => $self->{'report_options'}->{'log_string'},
+        'log_file'          => $self->{'report_options'}->{'log_file'},
+        'log_dir'           => $self->{'report_options'}->{'log_dir'},
+        'log_livestatus'    => $self->{'report_options'}->{'log_livestatus'},
+    );
 
-    $self->_compute_availability_from_log_store($result);
+    my $logs = $mal->get_logs();
+    $self->_compute_availability_from_log_store($result, $logs);
 
     return($result);
 }
@@ -333,11 +328,7 @@ sub get_full_logs {
 ########################################
 sub _reset {
     my $self   = shift;
-
     $self->_log('_reset()');
-
-    undef $self->{'logs'};
-    $self->{'logs'} = [];
 
     undef $self->{'full_log_store'};
     $self->{'full_log_store'} = [];
@@ -349,235 +340,6 @@ sub _reset {
     delete $self->{'report_options'};
 
     return 1;
-}
-
-########################################
-sub _store_logs_from_string {
-    my $self   = shift;
-    my $string = shift;
-    $self->_log('_store_logs_from_string()');
-    return unless defined $string;
-    for my $line (split/\n/mx, $string) {
-        my $data = $self->_parse_line($line);
-        push @{$self->{'logs'}}, $data if defined $data;
-    }
-    return 1;
-}
-
-########################################
-sub _store_logs_from_file {
-    my $self   = shift;
-    my $file   = shift;
-    $self->_log('_store_logs_from_file()');
-    return unless defined $file;
-
-    open(my $FH, '<', $file) or croak('cannot read file '.$file.': '.$!);
-    while(my $line = <$FH>) {
-        chomp($line);
-        my $data = $self->_parse_line($line);
-        push @{$self->{'logs'}}, $data if defined $data;
-    }
-    close($FH);
-    return 1;
-}
-
-########################################
-sub _store_logs_from_dir {
-    my $self   = shift;
-    my $dir   = shift;
-    $self->_log('_store_logs_from_dir()');
-
-    return unless defined $dir;
-
-    opendir(my $dh, $dir) or croak('cannot open directory '.$dir.': '.$!);
-    while(my $file = readdir($dh)) {
-        if($file =~ m/\.log$/mx) {
-            $self->_store_logs_from_file($dir.'/'.$file);
-        }
-    }
-    closedir $dh;
-
-    return 1;
-}
-
-########################################
-sub _store_logs_from_livestatus {
-    my $self      = shift;
-    my $log_array = shift;
-    $self->_log('_store_logs_from_livestatus()');
-    return unless defined $log_array;
-    for my $entry (@{$log_array}) {
-        my $data = $self->_parse_livestatus_entry($entry);
-        push @{$self->{'logs'}}, $data if defined $data;
-    }
-    return 1;
-}
-
-########################################
-sub _parse_livestatus_entry {
-    my $self   = shift;
-    my $entry  = shift;
-
-    my $string = $entry->{'options'} || '';
-    if($string eq '') {
-        # extract starts/stops
-        $self->_set_from_type($entry, $string);
-        return $entry;
-    }
-
-    # extract more information from our options
-    $self->_set_from_options($entry, $string);
-
-    return $entry;
-}
-
-########################################
-sub _parse_line {
-    my $self   = shift;
-    my $string = shift;
-    my $return = {
-        'time' => '',
-        'type' => '',
-    };
-
-    return if substr($string, 0, 1, '') ne '[';
-    $return->{'time'} = substr($string, 0, 10, '');
-    return if substr($string, 0, 2, '') ne '] ';
-
-    $return->{'type'} = $self->_strtok($string, ': ');
-    if(!defined $string) {
-        # extract starts/stops
-        $self->_set_from_type($return, $string);
-        return $return;
-    }
-
-    # extract more information from our options
-    $self->_set_from_options($return, $string);
-
-    return $return;
-}
-
-########################################
-# search for a token and return first occurance, trim that part from string
-sub _strtok {
-    my $index = index($_[1], $_[2]);
-    if($index != -1) {
-        my $value = substr($_[1], 0, $index, '');
-        substr($_[1], 0, length($_[2]), '');
-        return($value);
-    }
-
-    my $value = $_[1];
-    undef $_[1];
-
-    # seperator not found
-    return($value);
-}
-
-########################################
-sub _set_from_options {
-    my $self   = shift;
-    my $data   = shift;
-    my $string = shift;
-
-    # Host States
-    if(   $data->{'type'} eq 'HOST ALERT'
-       or $data->{'type'} eq 'CURRENT HOST STATE'
-       or $data->{'type'} eq 'INITIAL HOST STATE'
-    ) {
-        $data->{'host_name'}     = $self->_strtok($string, ';');
-        $data->{'state'}         = $self->_statestr_to_state($self->_strtok($string, ';'));
-        $data->{'hard'}          = $self->_softstr_to_hard($self->_strtok($string, ';'));
-                                   $self->_strtok($string, ';');
-        $data->{'plugin_output'} = $self->_strtok($string, ';');
-    }
-
-    # Service States
-    elsif(   $data->{'type'} eq 'SERVICE ALERT'
-       or $data->{'type'} eq 'CURRENT SERVICE STATE'
-       or $data->{'type'} eq 'INITIAL SERVICE STATE'
-    ) {
-        $data->{'host_name'}           = $self->_strtok($string, ';');
-        $data->{'service_description'} = $self->_strtok($string, ';');
-        $data->{'state'}               = $self->_statestr_to_state($self->_strtok($string, ';'));
-        $data->{'hard'}                = $self->_softstr_to_hard($self->_strtok($string, ';'));
-                                         $self->_strtok($string, ';');
-        $data->{'plugin_output'}       = $self->_strtok($string, ';');
-    }
-
-    # Host Downtimes
-    elsif($data->{'type'} eq 'HOST DOWNTIME ALERT') {
-        $data->{'host_name'} = $self->_strtok($string, ';');
-        $data->{'start'}     = $self->_startstr_to_start($self->_strtok($string, ';'));
-    }
-
-    # Service Downtimes
-    elsif($data->{'type'} eq 'SERVICE DOWNTIME ALERT') {
-        $data->{'host_name'}           = $self->_strtok($string, ';');
-        $data->{'service_description'} = $self->_strtok($string, ';');
-        $data->{'start'}               = $self->_startstr_to_start($self->_strtok($string, ';'));
-    }
-
-    return 1;
-}
-
-########################################
-sub _set_from_type {
-    my $self   = shift;
-    my $data   = shift;
-    my $string = shift;
-
-    # program starts
-    if($data->{'type'} =~ m/\ starting\.\.\./mx) {
-        $data->{'proc_start'} = START_NORMAL;
-    }
-    elsif($data->{'type'} =~ m/\ restarting\.\.\./mx) {
-        $data->{'proc_start'} = START_RESTART;
-    }
-
-    # program stops
-    elsif($data->{'type'} =~ m/shutting\ down\.\.\./mx) {
-        $data->{'proc_start'} = STOP_NORMAL;
-    }
-    elsif($data->{'type'} =~ m/Bailing\ out/mx) {
-        $data->{'proc_start'} = STOP_ERROR;
-    }
-
-    return 1;
-}
-
-########################################
-sub _startstr_to_start {
-    my $self   = shift;
-    my $string = shift;
-
-    return 1 if $string eq 'STARTED';
-    return 0;
-}
-
-########################################
-sub _softstr_to_hard {
-    my $self   = shift;
-    my $string = shift;
-
-    return 1 if $string eq 'HARD';
-    return 0;
-}
-
-########################################
-sub _statestr_to_state {
-    my $self   = shift;
-    my $string = shift;
-
-    return 0 if $string eq 'UP';
-    return 0 if $string eq 'OK';
-    return 1 if $string eq 'WARNING';
-    return 1 if $string eq 'DOWN';
-    return 2 if $string eq 'CRITICAL';
-    return 2 if $string eq 'UNREACHABLE';
-    return 3 if $string eq 'UNKNOWN';
-    return 0 if $string eq 'RECOVERY';
-    confess("unknown state: $string");
 }
 
 ########################################
@@ -668,19 +430,20 @@ sub _set_empty_services {
 sub _compute_availability_from_log_store {
     my $self    = shift;
     my $result  = shift;
+    my $logs    = shift;
 
     $self->_log('_compute_availability_from_log_store()');
     $self->_log('_compute_availability_from_log_store() report start: '.(scalar localtime $self->{'report_options'}->{'start'}));
     $self->_log('_compute_availability_from_log_store() report end:   '.(scalar localtime $self->{'report_options'}->{'end'}));
 
     # make sure our logs are sorted by time
-    @{$self->{'logs'}} = sort { $a->{'time'} <=> $b->{'time'} } @{$self->{'logs'}};
+    @{$logs} = sort { $a->{'time'} <=> $b->{'time'} } @{$logs};
 
     $self->_log('_compute_availability_from_log_store() sorted logs');
 
     # process all log lines we got
     my $last_time = -1;
-    for my $data (@{$self->{'logs'}}) {
+    for my $data (@{$logs}) {
         # if we reach the start date of our report, insert a fake entry
         if($last_time < $self->{'report_options'}->{'start'} and $data->{'time'} > $self->{'report_options'}->{'start'}) {
             $self->_insert_fake_start_event($result);

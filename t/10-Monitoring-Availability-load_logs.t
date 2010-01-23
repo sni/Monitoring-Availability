@@ -7,7 +7,7 @@ use Test::More tests => 60;
 use Data::Dumper;
 use File::Temp qw/ tempfile tempdir /;
 
-use_ok('Monitoring::Availability');
+use_ok('Monitoring::Availability::Logs');
 
 #########################
 
@@ -41,8 +41,8 @@ my $expected = [
     { 'time' => '1263648166', 'type' => 'LOG VERSION' },
 ];
 
-my $ma = Monitoring::Availability->new();
-isa_ok($ma, 'Monitoring::Availability', 'create new Monitoring::Availability object');
+my $mal = Monitoring::Availability::Logs->new();
+isa_ok($mal, 'Monitoring::Availability::Logs', 'create new Monitoring::Availability::Logs object');
 
 ####################################
 # try logs, line by line
@@ -50,10 +50,10 @@ my $x = 0;
 my $logs;
 while(my $line = <DATA>) {
     $logs .= $line;
-    $ma->_reset;
-    my $rt = $ma->_store_logs_from_string($line);
-    is($rt, 1, '_store_logs_from_string rc') or fail_out($x, $line, $ma);
-    is_deeply($ma->{'logs'}->[0], $expected->[$x], 'reading logs from string') or fail_out($x, $line, $ma);
+    $mal->{'logs'} = [];
+    my $rt = $mal->_store_logs_from_string($line);
+    is($rt, 1, '_store_logs_from_string rc') or fail_out($x, $line, $mal);
+    is_deeply($mal->{'logs'}->[0], $expected->[$x], 'reading logs from string') or fail_out($x, $line, $mal);
     $x++;
 }
 
@@ -63,10 +63,10 @@ my($fh,$filename) = tempfile(CLEANUP => 1);
 print $fh $logs;
 close($fh);
 
-$ma->_reset;
-my $rt = $ma->_store_logs_from_file($filename);
+$mal->{'logs'} = [];
+my $rt = $mal->_store_logs_from_file($filename);
 is($rt, 1, '_store_logs_from_file rc');
-is_deeply($ma->{'logs'}, $expected, 'reading logs from file');
+is_deeply($mal->{'logs'}, $expected, 'reading logs from file');
 
 ####################################
 # write logs to temp dir and load it
@@ -75,10 +75,10 @@ open(my $logfile, '>', $dir.'/monitoring.log') or die('cannot write to '.$dir.'/
 print $logfile $logs;
 close($logfile);
 
-$ma->_reset;
-$rt = $ma->_store_logs_from_dir($dir);
+$mal->{'logs'} = [];
+$rt = $mal->_store_logs_from_dir($dir);
 is($rt, 1, '_store_logs_from_dir rc');
-is_deeply($ma->{'logs'}, $expected, 'reading logs from dir');
+is_deeply($mal->{'logs'}, $expected, 'reading logs from dir');
 
 
 
@@ -87,9 +87,9 @@ is_deeply($ma->{'logs'}, $expected, 'reading logs from dir');
 sub fail_out {
     my $x    = shift;
     my $line = shift;
-    my $ma   = shift;
+    my $mal  = shift;
     diag('line: '.Dumper($line));
-    diag('got : '.Dumper($ma->{'logs'}->[0]));
+    diag('got : '.Dumper($mal->{'logs'}->[0]));
     diag('exp : '.Dumper($expected->[$x]));
     BAIL_OUT('failed');
 }
