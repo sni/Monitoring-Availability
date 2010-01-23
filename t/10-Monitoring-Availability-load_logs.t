@@ -50,7 +50,7 @@ my $x = 0;
 my $logs;
 while(my $line = <DATA>) {
     $logs .= $line;
-    $ma->_reset_log_store;
+    $ma->_reset;
     my $rt = $ma->_store_logs_from_string($line);
     is($rt, 1, '_store_logs_from_string rc') or fail_out($x, $line, $ma);
     is_deeply($ma->{'logs'}->[0], $expected->[$x], 'reading logs from string') or fail_out($x, $line, $ma);
@@ -63,7 +63,7 @@ my($fh,$filename) = tempfile(CLEANUP => 1);
 print $fh $logs;
 close($fh);
 
-$ma->_reset_log_store;
+$ma->_reset;
 my $rt = $ma->_store_logs_from_file($filename);
 is($rt, 1, '_store_logs_from_file rc');
 is_deeply($ma->{'logs'}, $expected, 'reading logs from file');
@@ -75,7 +75,7 @@ open(my $logfile, '>', $dir.'/monitoring.log') or die('cannot write to '.$dir.'/
 print $logfile $logs;
 close($logfile);
 
-$ma->_reset_log_store;
+$ma->_reset;
 $rt = $ma->_store_logs_from_dir($dir);
 is($rt, 1, '_store_logs_from_dir rc');
 is_deeply($ma->{'logs'}, $expected, 'reading logs from dir');
