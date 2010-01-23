@@ -11,7 +11,7 @@ use Exporter;
 use Data::Dumper;
 use Test::More;
 
-use vars qw(@ISA @EXPORT); 
+use vars qw(@ISA @EXPORT);
 @ISA = qw(Exporter);
 @EXPORT = qw ($logger);
 
@@ -43,13 +43,21 @@ sub check_array_one_by_one {
     my $name = shift;
 
     for(my $x = 0; $x <= scalar @{$exp}; $x++) {
-        Test::More::is_deeply($got->[$x], $exp->[$x], $name.' '.$x) or Test::More::diag("got:\n".Dumper($got->[0])."\nbut expected:\n".Dumper($exp->[0]));
+        Test::More::is_deeply($got->[$x], $exp->[$x], $name.' '.$x) or Test::More::diag("got:\n".Dumper($got->[$x])."\nbut expected:\n".Dumper($exp->[$x]));
     }
     return 1;
 }
 #########################
+sub parse_logs {
+    my $text = shift;
+    print "my \$expected_log = [\n";
+    for my $line (split/\n/, $text) {
+        my($start,$end,$duration,$type,$plugin_output) = split/\t/, $line;
+        print "    { 'start' => '".$start."', 'end' => '".$end."', 'duration' => '".$duration."', 'type' => '".$type."', 'plugin_output' => '".$plugin_output."' }, \n";
+    }
+    print "];\n";
+}
 
 1;
 
 __END__
-

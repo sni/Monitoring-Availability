@@ -3,7 +3,7 @@
 #########################
 
 use strict;
-use Test::More tests => 18;
+use Test::More tests => 14;
 use Data::Dumper;
 
 BEGIN {
@@ -40,22 +40,18 @@ my $expected = {
 };
 
 my $expected_condensed_log = [
-    { 'start' => '2010-01-21 23:12:10', end => '2010-01-21 23:13:05', 'duration' => '0d 0h 0m 55s',  'type' => 'SERVICE DOWNTIME START', plugin_output => 'Start of scheduled downtime', 'class' => 'INDETERMINATE' },
-    { 'start' => '2010-01-21 23:13:05', end => '2010-01-21 23:13:37', 'duration' => '0d 0h 0m 32s',  'type' => 'SERVICE DOWNTIME END', plugin_output => 'End of scheduled downtime', 'class' => 'INDETERMINATE' },
-    { 'start' => '2010-01-21 23:14:00', end => '2010-01-21 23:14:20', 'duration' => '0d 0h 0m 20s',  'type' => 'SERVICE UNKNOWN (HARD)', plugin_output => 'unknown', 'class' => 'UNKNOWN' },
-    { 'start' => '2010-01-21 23:14:20', end => '2010-01-21 23:14:34', 'duration' => '0d 0h 0m 14s',  'type' => 'SERVICE CRITICAL (HARD)', plugin_output => 'critical', 'class' => 'CRITICAL' },
-    { 'start' => '2010-01-21 23:14:34', end => '2010-01-21 23:25:07', 'duration' => '0d 0h 10m 33s+','type' => 'HOST DOWNTIME START', plugin_output => 'Start of scheduled downtime', 'class' => 'INDETERMINATE' },
+    { 'start' => '2010-01-09 00:00:00', end => '2010-01-09 14:11:33', 'duration' => '0d 14h 11m 33s',  'type' => 'HOST UP (HARD)',      plugin_output => 'n0_test_host_000 ...',        'class' => 'UP' },
+    { 'start' => '2010-01-09 14:11:33', end => '2010-01-09 14:22:53', 'duration' => '0d 0h 11m 20s',   'type' => 'HOST DOWNTIME START', plugin_output => 'Start of scheduled downtime', 'class' => 'INDETERMINATE' },
+    { 'start' => '2010-01-09 14:22:53', end => '2010-01-09 14:25:55', 'duration' => '0d 0h 3m 2s',     'type' => 'HOST DOWNTIME STOP',  plugin_output => 'End of scheduled downtime',   'class' => 'INDETERMINATE' },
 ];
 
 my $expected_full_log = [
-    { 'start' => '2010-01-21 23:05:15', end => '2010-01-21 23:12:10', 'duration' => '0d 0h 6m 55s',  'type' => 'PROGRAM (RE)START', plugin_output => 'Program start', 'class' => 'INDETERMINATE' },
-    { 'start' => '2010-01-21 23:12:10', end => '2010-01-21 23:13:05', 'duration' => '0d 0h 0m 55s',  'type' => 'SERVICE DOWNTIME START', plugin_output => 'Start of scheduled downtime', 'class' => 'INDETERMINATE' },
-    { 'start' => '2010-01-21 23:13:05', end => '2010-01-21 23:13:37', 'duration' => '0d 0h 0m 32s',  'type' => 'SERVICE DOWNTIME END', plugin_output => 'End of scheduled downtime', 'class' => 'INDETERMINATE' },
-    { 'start' => '2010-01-21 23:13:37', end => '2010-01-21 23:13:38', 'duration' => '0d 0h 0m 1s',   'type' => 'PROGRAM (RE)START', plugin_output => 'Program restart', 'class' => 'INDETERMINATE' },
-    { 'start' => '2010-01-21 23:13:38', end => '2010-01-21 23:14:00', 'duration' => '0d 0h 0m 22s',  'type' => 'PROGRAM (RE)START', plugin_output => 'Program start', 'class' => 'INDETERMINATE' },
-    { 'start' => '2010-01-21 23:14:00', end => '2010-01-21 23:14:20', 'duration' => '0d 0h 0m 20s',  'type' => 'SERVICE UNKNOWN (HARD)', plugin_output => 'unknown', 'class' => 'UNKNOWN' },
-    { 'start' => '2010-01-21 23:14:20', end => '2010-01-21 23:14:34', 'duration' => '0d 0h 0m 14s',  'type' => 'SERVICE CRITICAL (HARD)', plugin_output => 'critical', 'class' => 'CRITICAL' },
-    { 'start' => '2010-01-21 23:14:34', end => '2010-01-21 23:25:07', 'duration' => '0d 0h 10m 33s+','type' => 'HOST DOWNTIME START', plugin_output => 'Start of scheduled downtime', 'class' => 'INDETERMINATE' },
+    { 'start' => '2010-01-08 15:50:52', end => '2010-01-09 00:00:00', 'duration' => '0d 8h 9m 8s',  'type' => 'PROGRAM (RE)START', plugin_output => 'Program start', 'class' => 'INDETERMINATE' },
+    { 'start' => '2010-01-09 00:00:00', end => '2010-01-09 14:11:33', 'duration' => '0d 14h 11m 33s',  'type' => 'HOST UP (HARD)',      plugin_output => 'n0_test_host_000 ...',        'class' => 'UP' },
+    { 'start' => '2010-01-09 14:11:33', end => '2010-01-09 14:22:53', 'duration' => '0d 0h 11m 20s',   'type' => 'HOST DOWNTIME START', plugin_output => 'Start of scheduled downtime', 'class' => 'INDETERMINATE' },
+    { 'start' => '2010-01-09 14:22:53', end => '2010-01-09 14:25:55', 'duration' => '0d 0h 3m 2s',     'type' => 'HOST DOWNTIME STOP',  plugin_output => 'End of scheduled downtime',   'class' => 'INDETERMINATE' },
+    { 'start' => '2010-01-09 14:25:55', end => '2010-01-09 14:26:00', 'duration' => '0d 0h 0m 5s',  'type' => 'PROGRAM END', plugin_output => 'Normal program termination', 'class' => 'INDETERMINATE' },
+    { 'start' => '2010-01-09 14:26:00', end => '2010-01-14 20:54:10', 'duration' => '5d 6h 28m 10s+',  'type' => 'PROGRAM (RE)START', plugin_output => 'Program start', 'class' => 'INDETERMINATE' },
 ];
 
 #########################
@@ -75,19 +71,15 @@ my $result = $ma->calculate(
     'hosts'                         => ['n0_test_host_000'],
     'start'                         => 1262894050,
     'end'                           => 1263498850,
+    'timeformat'                    => '%Y-%m-%d %H:%M:%S',
 );
-TODO: {
-    $TODO = 'not yet implemented';
-    is_deeply($result, $expected, 'host with downtime') or diag("got:\n".Dumper($result)."\nbut expected:\n".Dumper($expected));
 
+is_deeply($result, $expected, 'host with downtime') or diag("got:\n".Dumper($result)."\nbut expected:\n".Dumper($expected));
+my $condensed_logs = $ma->get_condensed_logs();
+TestUtils::check_array_one_by_one($expected_condensed_log, $condensed_logs, 'condensed logs');
 
-    my $condensed_logs = $ma->get_condensed_logs();
-    TestUtils::check_array_one_by_one($expected_condensed_log, $condensed_logs, 'condensed logs');
-
-    my $full_logs = $ma->get_full_logs();
-    TestUtils::check_array_one_by_one($expected_full_log, $full_logs, 'full logs');
-    undef $TODO;
-};
+my $full_logs = $ma->get_full_logs();
+TestUtils::check_array_one_by_one($expected_full_log, $full_logs, 'full logs');
 
 __DATA__
 [1262962252] Nagios 3.2.0 starting... (PID=7873)

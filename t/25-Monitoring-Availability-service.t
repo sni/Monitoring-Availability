@@ -33,7 +33,7 @@ my $expected = {
                 'scheduled_time_ok'             => 0,
                 'scheduled_time_warning'        => 0,
                 'scheduled_time_unknown'        => 0,
-                'scheduled_time_critical'       => 0,
+                'scheduled_time_critical'       => 633,
                 'scheduled_time_indeterminate'  => 55,
 
                 'time_indeterminate_nodata'     => 85733,

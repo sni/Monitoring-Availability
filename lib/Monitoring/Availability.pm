@@ -71,9 +71,9 @@ Assumed service state if none is found, default: yes
 
 Go back this amount of days to find initial states, default: 4
 
-=item services_inherit_hostdowntimes
+=item showscheduleddowntime
 
-Services will inherit downtimes from hosts, default: no
+Include downtimes in calculation, default: yes
 
 =item timeformat
 
@@ -128,7 +128,6 @@ sub new {
         'initialassumedservicestate'     => undef,
         'backtrack'                      => undef,
         'showscheduleddowntime'          => undef,
-        'services_inherit_hostdowntimes' => undef,
     };
 
     bless $self, $class;
@@ -218,7 +217,6 @@ sub calculate {
         'initialassumedservicestate'     => $self->{'initialassumedservicestate'},
         'backtrack'                      => $self->{'backtrack'},
         'showscheduleddowntime'          => $self->{'showscheduleddowntime'},
-        'services_inherit_hostdowntimes' => $self->{'services_inherit_hostdowntimes'},
         'timeformat'                     => $self->{'timeformat'},
     };
     $self->_log('calculate()');
@@ -251,6 +249,12 @@ sub calculate {
         }
         $result->{'services'}->{$service->{'host'}}->{$service->{'service'}} = 1;
     }
+
+    # if we have more than one host or service, we dont build up a log
+    my $calc_count = scalar @{$options->{'hosts'}} + scalar @{$options->{'services'}};
+    $options->{'no_log'} = 0;
+    $options->{'no_log'} = 1 unless $calc_count == 1;
+
     $options->{'calc_all'} = 0;
     if(scalar keys %{$result->{'services'}} == 0 and scalar keys %{$result->{'hosts'}} == 0) {
         $self->_log('will calculate availability for all hosts/services found');
@@ -276,9 +280,7 @@ sub calculate {
         $self->_store_logs_from_livestatus($options->{'log_livestatus'});
     }
 
-    if(scalar @{$self->{'logs'}} >= 0) {
-        $self->_compute_availability_from_log_store($result, $options);
-    }
+    $self->_compute_availability_from_log_store($result, $options);
 
     return($result);
 }
@@ -841,7 +843,9 @@ sub _process_log_line {
             }
         }
         elsif($data->{'type'} eq 'SERVICE DOWNTIME ALERT') {
-            undef $data->{'state'}; # we dont know the current state, so make sure it isnt set
+            next unless $options->{'showscheduleddowntime'};
+
+            undef $data->{'state'}; # we dont know the current state, so make sure it wont be overwritten
             $self->_set_service_event($data->{'host_name'}, $data->{'service_description'}, $result, $options, $data);
 
             my $start;
@@ -900,16 +904,21 @@ sub _process_log_line {
             }
         }
         elsif($data->{'type'} eq 'HOST DOWNTIME ALERT') {
+            next unless $options->{'showscheduleddowntime'};
+
             my $last_state_time = $host_hist->{'last_state_time'};
 
-            if($options->{'services_inherit_hostdowntimes'}) {
-                $self->_log('_process_log_line() hostdowntime, inserting fake event for all services');
-                # set an event for all services
-                for my $service_description (keys %{$self->{'service_data'}->{$data->{'host_name'}}}) {
-                    $last_state_time = $self->{'service_data'}->{$data->{'host_name'}}->{$service_description}->{'last_state_time'};
-                    $self->_set_service_event($data->{'host_name'}, $service_description, $result, $options, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'} });
-                }
+            $self->_log('_process_log_line() hostdowntime, inserting fake event for all services');
+            # set an event for all services
+            for my $service_description (keys %{$self->{'service_data'}->{$data->{'host_name'}}}) {
+                $last_state_time = $self->{'service_data'}->{$data->{'host_name'}}->{$service_description}->{'last_state_time'};
+                $self->_set_service_event($data->{'host_name'}, $service_description, $result, $options, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'} });
             }
+
+            undef $data->{'state'}; # we dont know the current state, so make sure it wont be overwritten
+
+            # set the host event itself
+            $self->_set_host_event($data->{'host_name'}, $result, $options, $data);
 
             my $start;
             my $plugin_output;
@@ -972,7 +981,7 @@ sub _set_service_event {
             if($service_hist->{'last_state'} == STATE_OK) {
                 $self->_log('_set_service_event() ok + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $service_data->{'time_ok'} += $diff;
-                if($service_hist->{'in_downtime'} or ($options->{'services_inherit_hostdowntimes'} and $host_hist->{'in_downtime'})) {
+                if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
                     $self->_log('_set_service_event() ok sched + '.$diff.' seconds');
                     $service_data->{'scheduled_time_ok'} += $diff
                 }
@@ -982,7 +991,7 @@ sub _set_service_event {
             elsif($service_hist->{'last_state'} == STATE_WARNING) {
                 $self->_log('_set_service_event() warning + '.$diff.' seconds');
                 $service_data->{'time_warning'} += $diff;
-                if($service_hist->{'in_downtime'} or ($options->{'services_inherit_hostdowntimes'} and $host_hist->{'in_downtime'})) {
+                if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
                     $self->_log('_set_service_event() warning sched + '.$diff.' seconds');
                     $service_data->{'scheduled_time_warning'} += $diff
                 }
@@ -992,7 +1001,7 @@ sub _set_service_event {
             elsif($service_hist->{'last_state'} == STATE_CRITICAL) {
                 $self->_log('_set_service_event() critical + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $service_data->{'time_critical'} += $diff;
-                if($service_hist->{'in_downtime'} or ($options->{'services_inherit_hostdowntimes'} and $host_hist->{'in_downtime'})) {
+                if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
                     $self->_log('_set_service_event() critical sched + '.$diff.' seconds');
                     $service_data->{'scheduled_time_critical'} += $diff
                 }
@@ -1002,7 +1011,7 @@ sub _set_service_event {
             elsif($service_hist->{'last_state'} == STATE_UNKNOWN) {
                 $self->_log('_set_service_event() unknown + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $service_data->{'time_unknown'} += $diff;
-                if($service_hist->{'in_downtime'} or ($options->{'services_inherit_hostdowntimes'} and $host_hist->{'in_downtime'})) {
+                if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
                     $self->_log('_set_service_event() unknown sched + '.$diff.' seconds');
                     $service_data->{'scheduled_time_unknown'} += $diff
                 }
@@ -1012,7 +1021,7 @@ sub _set_service_event {
             elsif($service_hist->{'last_state'} == STATE_UNSPECIFIED) {
                 $self->_log('_set_service_event() indeterminate + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $service_data->{'time_indeterminate_nodata'} += $diff;
-                if($service_hist->{'in_downtime'} or ($options->{'services_inherit_hostdowntimes'} and $host_hist->{'in_downtime'})) {
+                if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
                     $self->_log('_set_service_event() indeterminate sched + '.$diff.' seconds');
                     $service_data->{'scheduled_time_indeterminate'} += $diff
                 }
@@ -1059,11 +1068,9 @@ sub _set_host_event {
         # we got a last state?
         if(defined $host_hist->{'last_state'}) {
             my $diff = $data->{'time'} - $host_hist->{'last_state_time'};
-            my $state_text;
 
             # up
             if($host_hist->{'last_state'} == STATE_UP) {
-                $state_text = "UP";
                 $self->_log('_set_host_event() up + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $host_data->{'time_up'} += $diff;
                 if($host_hist->{'in_downtime'}) {
@@ -1074,7 +1081,6 @@ sub _set_host_event {
 
             # down
             elsif($host_hist->{'last_state'} == STATE_DOWN) {
-                $state_text = "DOWN";
                 $self->_log('_set_host_event() down + '.$diff.' seconds');
                 $host_data->{'time_down'} += $diff;
                 if($host_hist->{'in_downtime'}) {
@@ -1085,7 +1091,6 @@ sub _set_host_event {
 
             # unreachable
             elsif($host_hist->{'last_state'} == STATE_UNREACHABLE) {
-                $state_text = "UNREACHABLE";
                 $self->_log('_set_host_event() unreachable + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $host_data->{'time_unreachable'} += $diff;
                 if($host_hist->{'in_downtime'}) {
@@ -1108,21 +1113,6 @@ sub _set_host_event {
             elsif($host_hist->{'last_state'} == STATE_NOT_RUNNING) {
                 $self->_log('_set_host_event() not_running + '.$diff.' seconds ('.$self->_duration($diff).')');
                 $host_data->{'time_indeterminate_notrunning'} += $diff;
-            }
-
-            # set a log entry
-            if(defined $state_text) {
-                my $hard = "";
-                $hard = " (HARD)" if $data->{'hard'};
-                $self->_add_log_entry(
-                            'options'     => $options,
-                            'log'         => {
-                                'start'         => $data->{'time'},
-                                'type'          => 'HOST '.$state_text.$hard,
-                                'plugin_output' => $data->{'plugin_output'},
-                                'class'         => $state_text,
-                            },
-                );
             }
         }
     }
@@ -1280,7 +1270,6 @@ sub _set_default_options {
     $options->{'initialassumedhoststate'}        = 'unspecified' unless defined $options->{'initialassumedhoststate'};
     $options->{'initialassumedservicestate'}     = 'unspecified' unless defined $options->{'initialassumedservicestate'};
     $options->{'showscheduleddowntime'}          = 'yes'         unless defined $options->{'showscheduleddowntime'};
-    $options->{'services_inherit_hostdowntimes'} = 'no'          unless defined $options->{'services_inherit_hostdowntimes'};
     $options->{'timeformat'}                     = '%s'          unless defined $options->{'timeformat'};
 
     return $options;
@@ -1304,7 +1293,6 @@ sub _verify_options {
                        assumestatesduringnotrunning
                        includesoftstates
                        showscheduleddowntime
-                       services_inherit_hostdowntimes
                       /) {
         if(defined $options->{$yes_no}) {
             if(lc $options->{$yes_no} eq 'yes') {
@@ -1373,8 +1361,8 @@ sub _add_log_entry {
     my $self    = shift;
     my %opts    = @_;
 
-    my @caller = caller;
-    $self->_log('_add_log_entry()'.Dumper(\@caller));
+    # do we build up a log?
+    return if $opts{'options'}->{'no_log'} == 1;
 
     if(defined $self->{'last_log_entry'}) {
         my $last_options   = $self->{'last_log_entry'};
@@ -1399,7 +1387,7 @@ sub _add_log_entry {
             }
 
 
-            $self->_log('  -> added from stack: '.Dumper($last_log_entry));
+            #$self->_log('  -> added from stack: '.Dumper($last_log_entry));
             if(!defined $last_options->{'full_only'} or $last_options->{'full_only'} == 0) {
                 push @{$self->{'log_output'}}, $last_log_entry;
             }

@@ -61,10 +61,7 @@ my $result = $ma->calculate(
     'start'                         => 1262894050,
     'end'                           => 1263498850,
 );
-TODO: {
-    local $TODO = "not yet implemented";
-    is_deeply($result, $expected, 'sample 1 result') or diag("got:\n".Dumper($result)."\nbut expected:\n".Dumper($expected));
-}
+is_deeply($result, $expected, 'sample 1 result') or diag("got:\n".Dumper($result)."\nbut expected:\n".Dumper($expected));
 
 __DATA__
 [1262962252] Nagios 3.2.0 starting... (PID=7873)
