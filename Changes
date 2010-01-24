@@ -1,5 +1,8 @@
 Revision history for Perl extension Monitoring::Availability.
 
+0.07  Sun Jan 24 21:39:55 CET 2010
+    - fixed report log for hosts with services
+
 0.06  Sun Jan 24 00:29:06 CET 2010
     - fixed initial states 'current'
 
