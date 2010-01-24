@@ -20,8 +20,8 @@ use vars qw(@ISA @EXPORT);
 our $logger;
 eval {
     if(defined $ENV{'TEST_LOG'}) {
-        use Log::Log4perl qw(:easy);
-        Log::Log4perl->easy_init($DEBUG);
+        require Log::Log4perl;
+        Log::Log4perl->import(qw(:easy));
         Log::Log4perl->init(\ q{
             log4perl.logger                    = DEBUG, Screen
             log4perl.appender.Screen           = Log::Log4perl::Appender::ScreenColoredLevels
