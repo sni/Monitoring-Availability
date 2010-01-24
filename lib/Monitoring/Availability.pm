@@ -113,6 +113,9 @@ use constant {
     START_RESTART       =>  2,
     STOP_NORMAL         =>  0,
     STOP_ERROR          => -1,
+
+    HOST_ONLY           => 2,
+    SERVICE_ONLY        => 3,
 };
 
 sub new {
@@ -157,6 +160,10 @@ sub new {
         'up'          => STATE_UP,
         'down'        => STATE_DOWN,
         'unreachable' => STATE_UNREACHABLE,
+        '0'           => STATE_OK,
+        '1'           => STATE_WARNING,
+        '2'           => STATE_CRITICAL,
+        '3'           => STATE_UNKNOWN,
     };
 
     $self->_log('initialized '.$class) if $self->{'verbose'};
@@ -301,9 +308,15 @@ sub calculate {
     }
 
     # if we have more than one host or service, we dont build up a log
-    my $calc_count = scalar @{$self->{'report_options'}->{'hosts'}} + scalar @{$self->{'report_options'}->{'services'}};
-    $self->{'report_options'}->{'no_log'} = FALSE;
-    $self->{'report_options'}->{'no_log'} = TRUE unless $calc_count == 1;
+    if(scalar @{$self->{'report_options'}->{'hosts'}} == 1) {
+        $self->{'report_options'}->{'build_log'} = HOST_ONLY;
+    }
+    elsif(scalar @{$self->{'report_options'}->{'services'}} == 1) {
+        $self->{'report_options'}->{'build_log'} = SERVICE_ONLY;
+    }
+    else {
+        $self->{'report_options'}->{'build_log'} = FALSE;
+    }
 
     $self->{'report_options'}->{'calc_all'} = FALSE;
     if(scalar keys %{$result->{'services'}} == 0 and scalar keys %{$result->{'hosts'}} == 0) {
@@ -344,7 +357,7 @@ returns an array of hashes with the condensed log used for this report
 sub get_condensed_logs {
     my $self = shift;
 
-    return if $self->{'report_options'}->{'no_log'} == TRUE;
+    return if $self->{'report_options'}->{'build_log'} == FALSE;
 
     $self->_calculate_log() unless $self->{'log_output_calculated'};
 
@@ -365,7 +378,7 @@ returns an array of hashes with the full log used for this report
 sub get_full_logs {
     my $self = shift;
 
-    return if $self->{'report_options'}->{'no_log'} == TRUE;
+    return if $self->{'report_options'}->{'build_log'} == FALSE;
 
     $self->_calculate_log() unless $self->{'log_output_calculated'};
 
@@ -409,7 +422,7 @@ sub _set_empty_hosts {
         my $first_state = $initial_assumend_state;
         if($initial_assumend_state == STATE_CURRENT) {
             eval { $first_state = $self->_state_to_int($self->{'report_options'}->{'initial_states'}->{'hosts'}->{$hostname}); };
-            if($@) { croak("found no initial state for host '$hostname'\ngot: ".Dumper($self->{'report_options'}->{'initial_states'})); }
+            if($@) { croak("found no initial state for host '$hostname'\ngot: ".Dumper($self->{'report_options'}->{'initial_states'}).Dumper($@)); }
             $self->{'report_options'}->{'first_state'} = $first_state;
         }
         $data->{'hosts'}->{$hostname} = {
@@ -453,7 +466,7 @@ sub _set_empty_services {
             my $first_state = $initial_assumend_state;
             if($initial_assumend_state == STATE_CURRENT) {
                 eval { $first_state = $self->_state_to_int($self->{'report_options'}->{'initial_states'}->{'services'}->{$hostname}->{$service_description}); };
-                if($@) { croak("found no initial state for service '$service_description' on host '$hostname'\ngot: ".Dumper($self->{'report_options'}->{'initial_states'})); }
+                if($@) { croak("found no initial state for service '$service_description' on host '$hostname'\ngot: ".Dumper($self->{'report_options'}->{'initial_states'}).Dumper($@)); }
                 $self->{'report_options'}->{'first_state'} = $first_state;
             }
             $data->{'services'}->{$hostname}->{$service_description} = {
@@ -580,7 +593,12 @@ sub _process_log_line {
     }
 
     # skip services we dont need
-    if($self->{'report_options'}->{'calc_all'} == 0 and defined $data->{'host_name'} and defined $data->{'service_description'} and !defined $self->{'service_data'}->{$data->{'host_name'}}->{$data->{'service_description'}}) {
+    if($self->{'report_options'}->{'calc_all'} == 0
+       and defined $data->{'host_name'}
+       and defined $data->{'service_description'}
+       and $data->{'service_description'} ne ''
+       and !defined $self->{'service_data'}->{$data->{'host_name'}}->{$data->{'service_description'}}
+      ) {
         $self->_log('  -> skipped not needed service event') if $self->{'verbose'};
         return;
     }
@@ -649,7 +667,7 @@ sub _process_log_line {
     }
 
     # service events
-    elsif(defined $data->{'service_description'}) {
+    elsif(defined $data->{'service_description'} and $data->{'service_description'} ne '') {
         my $service_hist = $self->{'service_data'}->{$data->{'host_name'}}->{$data->{'service_description'}};
 
         if($data->{'type'} eq 'CURRENT SERVICE STATE' or $data->{'type'} eq 'SERVICE ALERT' or $data->{'type'} eq 'INITIAL SERVICE STATE') {
@@ -671,7 +689,7 @@ sub _process_log_line {
                                 'plugin_output' => $data->{'plugin_output'},
                                 'class'         => $state_text,
                             },
-                );
+                ) unless $self->{'report_options'}->{'build_log'} == HOST_ONLY;
             }
         }
         elsif($data->{'type'} eq 'SERVICE DOWNTIME ALERT') {
@@ -701,7 +719,7 @@ sub _process_log_line {
                                 'plugin_output' => $plugin_output,
                                 'class'         => 'INDETERMINATE',
                             },
-            );
+            ) unless $self->{'report_options'}->{'build_log'} == HOST_ONLY;
         }
         else {
             $self->_log('  -> unknown log type') if $self->{'verbose'};
@@ -1189,7 +1207,7 @@ sub _add_log_entry {
     $self->_log('_add_log_entry()') if $self->{'verbose'};
 
     # do we build up a log?
-    return if $self->{'report_options'}->{'no_log'} == TRUE;
+    return if $self->{'report_options'}->{'build_log'} == FALSE;
 
     push @{$self->{'full_log_store'}}, \%opts;
 
