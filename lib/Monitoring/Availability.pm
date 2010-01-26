@@ -8,7 +8,7 @@ use Carp;
 use POSIX qw(strftime);
 use Monitoring::Availability::Logs;
 
-our $VERSION = '0.07_2';
+our $VERSION = '0.07_3';
 
 
 =head1 NAME
@@ -330,15 +330,18 @@ sub calculate {
     }
 
     # read in logs
-    my $mal = Monitoring::Availability::Logs->new(
-        'log_string'        => $self->{'report_options'}->{'log_string'},
-        'log_file'          => $self->{'report_options'}->{'log_file'},
-        'log_dir'           => $self->{'report_options'}->{'log_dir'},
-        'log_livestatus'    => $self->{'report_options'}->{'log_livestatus'},
-    );
-
-    my $logs = $mal->get_logs();
-    $self->_compute_availability_from_log_store($result, $logs);
+    if(defined $self->{'report_options'}->{'log_string'} or $self->{'report_options'}->{'log_file'} or $self->{'report_options'}->{'log_dir'}) {
+        my $mal = Monitoring::Availability::Logs->new(
+            'log_string'        => $self->{'report_options'}->{'log_string'},
+            'log_file'          => $self->{'report_options'}->{'log_file'},
+            'log_dir'           => $self->{'report_options'}->{'log_dir'},
+        );
+        my $logs = $mal->get_logs();
+        $self->_compute_availability_from_log_store($result, $logs);
+    }
+    elsif(defined $self->{'report_options'}->{'log_livestatus'}) {
+        $self->_compute_availability_on_the_fly($result, $self->{'report_options'}->{'log_livestatus'});
+    }
 
     return($result);
 }
@@ -509,6 +512,68 @@ sub _set_empty_services {
 }
 
 ########################################
+sub _compute_for_data {
+    my $self        = shift;
+    my $last_time   = shift;
+    my $data        = shift;
+    my $result      = shift;
+
+    # if we reach the start date of our report, insert a fake entry
+    if($last_time < $self->{'report_options'}->{'start'} and $data->{'time'} > $self->{'report_options'}->{'start'}) {
+        $self->_insert_fake_start_event($result);
+    }
+
+    # end of report reached, insert fake end event
+    if($data->{'time'} > $self->{'report_options'}->{'end'} and $last_time < $self->{'report_options'}->{'end'}) {
+        $self->_insert_fake_end_event($result);
+
+        # set a log entry
+        $self->_add_log_entry(
+                        'full_only'   => 1,
+                        'log'         => {
+                            'start'         => $self->{'report_options'}->{'end'},
+                        },
+        );
+    }
+
+    # now process the real line
+    $self->_process_log_line($result, $data);
+}
+
+########################################
+sub _compute_availability_on_the_fly {
+    my $self    = shift;
+    my $result  = shift;
+    my $logs    = shift;
+
+    if($self->{'verbose'}) {
+        $self->_log('_compute_availability_on_the_fly()');
+        $self->_log('_compute_availability_on_the_fly() report start: '.(scalar localtime $self->{'report_options'}->{'start'}));
+        $self->_log('_compute_availability_on_the_fly() report end:   '.(scalar localtime $self->{'report_options'}->{'end'}));
+    }
+
+    # process all log lines we got
+    # make sure our logs are sorted by time
+    my $last_time = -1;
+    for my $data ( sort { $a->{'time'} <=> $b->{'time'} } @{$logs} ) {
+
+        $self->_compute_for_data($last_time,
+                                 Monitoring::Availability::Logs->_parse_livestatus_entry($data),
+                                 $result);
+
+        # set timestamp of last log line
+        $last_time = $data->{'time'};
+    }
+
+    # processing logfiles finished
+
+    $self->_add_last_time_event($last_time, $result);
+
+    return 1;
+}
+
+
+########################################
 sub _compute_availability_from_log_store {
     my $self    = shift;
     my $result  = shift;
@@ -528,32 +593,26 @@ sub _compute_availability_from_log_store {
     # process all log lines we got
     my $last_time = -1;
     for my $data (@{$logs}) {
-        # if we reach the start date of our report, insert a fake entry
-        if($last_time < $self->{'report_options'}->{'start'} and $data->{'time'} > $self->{'report_options'}->{'start'}) {
-            $self->_insert_fake_start_event($result);
-        }
 
-        # end of report reached, insert fake end event
-        if($data->{'time'} > $self->{'report_options'}->{'end'} and $last_time < $self->{'report_options'}->{'end'}) {
-            $self->_insert_fake_end_event($result);
-
-            # set a log entry
-            $self->_add_log_entry(
-                            'full_only'   => 1,
-                            'log'         => {
-                                'start'         => $self->{'report_options'}->{'end'},
-                            },
-            );
-        }
-
-        # now process the real line
-        $self->_process_log_line($result, $data);
+        $self->_compute_for_data($last_time, $data, $result);
 
         # set timestamp of last log line
         $last_time = $data->{'time'};
     }
 
     # processing logfiles finished
+
+    $self->_add_last_time_event($last_time, $result);
+
+    return 1;
+}
+
+
+########################################
+sub _add_last_time_event {
+    my $self      = shift;
+    my $last_time = shift;
+    my $result    = shift;
 
     # no start event yet, insert a fake entry
     if($last_time < $self->{'report_options'}->{'start'}) {
