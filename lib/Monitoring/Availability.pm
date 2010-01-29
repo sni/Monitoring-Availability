@@ -8,7 +8,7 @@ use Carp;
 use POSIX qw(strftime);
 use Monitoring::Availability::Logs;
 
-our $VERSION = '0.07_3';
+our $VERSION = '0.08';
 
 
 =head1 NAME
@@ -538,6 +538,8 @@ sub _compute_for_data {
 
     # now process the real line
     $self->_process_log_line($result, $data);
+
+    return 1;
 }
 
 ########################################
