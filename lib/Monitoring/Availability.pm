@@ -8,7 +8,7 @@ use Carp;
 use POSIX qw(strftime);
 use Monitoring::Availability::Logs;
 
-our $VERSION = '0.08';
+our $VERSION = '0.10';
 
 
 =head1 NAME
@@ -1308,11 +1308,13 @@ sub _calculate_log {
         elsif($first_state == STATE_WARNING)  { $type = 'WARNING'; }
         elsif($first_state == STATE_UNKNOWN)  { $type = 'UNKNOWN'; }
         elsif($first_state == STATE_CRITICAL) { $type = 'CRITICAL'; }
+        my $fake_start = $self->{'report_options'}->{'start'};
+        if($fake_start >= $self->{'full_log_store'}->[0]->{'log'}->{'start'}) { $fake_start = $self->{'full_log_store'}->[0]->{'log'}->{'start'} - 1; }
         my $fakelog = {
             'log' => {
                 'type'          => 'SERVICE '.$type.' (HARD)',
                 'class'         => $type,
-                'start'         => $self->{'full_log_store'}->[0]->{'log'}->{'start'} - 1,
+                'start'         => $fake_start,
                 'plugin_output' => 'First Service State Assumed (Faked Log Entry)',
             }
         };
@@ -1329,11 +1331,13 @@ sub _calculate_log {
         if($first_state == STATE_UP)             { $type = 'UP'; }
         elsif($first_state == STATE_DOWN)        { $type = 'DOWN'; }
         elsif($first_state == STATE_UNREACHABLE) { $type = 'UNREACHABLE'; }
+        my $fake_start = $self->{'report_options'}->{'start'};
+        if($fake_start >= $self->{'full_log_store'}->[0]->{'log'}->{'start'}) { $fake_start = $self->{'full_log_store'}->[0]->{'log'}->{'start'} - 1; }
         my $fakelog = {
             'log' => {
                 'type'          => 'HOST '.$type.' (HARD)',
                 'class'         => $type,
-                'start'         => $self->{'full_log_store'}->[0]->{'log'}->{'start'} - 1,
+                'start'         => $fake_start,
                 'plugin_output' => 'First Host State Assumed (Faked Log Entry)',
             }
         };
