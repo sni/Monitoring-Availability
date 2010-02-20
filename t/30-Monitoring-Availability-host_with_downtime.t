@@ -79,10 +79,18 @@ my $result = $ma->calculate(
 
 is_deeply($result, $expected, 'host with downtime') or diag("got:\n".Dumper($result)."\nbut expected:\n".Dumper($expected));
 my $condensed_logs = $ma->get_condensed_logs();
-TestUtils::check_array_one_by_one($expected_condensed_log, $condensed_logs, 'condensed logs');
+# test will fail on windows because of a different used timezone
+SKIP: {
+    skip("cannot test on windows, timezone is different", 3) if $^O eq "MSWin32";
+    TestUtils::check_array_one_by_one($expected_condensed_log, $condensed_logs, 'condensed logs');
+}
 
 my $full_logs = $ma->get_full_logs();
-TestUtils::check_array_one_by_one($expected_full_log, $full_logs, 'full logs');
+# test will fail on windows because of a different used timezone
+SKIP: {
+    skip("cannot test on windows, timezone is different", 6) if $^O eq "MSWin32";
+    TestUtils::check_array_one_by_one($expected_full_log, $full_logs, 'full logs');
+}
 
 __DATA__
 [1262962252] Nagios 3.2.0 starting... (PID=7873)
