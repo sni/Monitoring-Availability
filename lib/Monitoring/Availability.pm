@@ -8,7 +8,7 @@ use Carp;
 use POSIX qw(strftime);
 use Monitoring::Availability::Logs;
 
-our $VERSION = '0.11_1';
+our $VERSION = '0.12';
 
 
 =head1 NAME
@@ -1332,7 +1332,7 @@ sub _calculate_log {
         elsif($first_state == STATE_DOWN)        { $type = 'DOWN'; }
         elsif($first_state == STATE_UNREACHABLE) { $type = 'UNREACHABLE'; }
         my $fake_start = $self->{'report_options'}->{'start'};
-        if($fake_start >= $self->{'full_log_store'}->[0]->{'log'}->{'start'}) { $fake_start = $self->{'full_log_store'}->[0]->{'log'}->{'start'} - 1; }
+        if(defined $self->{'full_log_store'}->[0] and $fake_start >= $self->{'full_log_store'}->[0]->{'log'}->{'start'}) { $fake_start = $self->{'full_log_store'}->[0]->{'log'}->{'start'} - 1; }
         my $fakelog = {
             'log' => {
                 'type'          => 'HOST '.$type.' (HARD)',
