@@ -1,5 +1,8 @@
 Revision history for Perl extension Monitoring::Availability.
 
+0.14  Fri Jun 18 11:53:49 CEST 2010
+    - excluded some tests on windows hosts
+
 0.12  Sun Feb 21 18:04:47 CET 2010
     - fixed initial fake log for empty logs
 

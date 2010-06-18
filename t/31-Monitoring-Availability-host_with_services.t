@@ -3,13 +3,20 @@
 #########################
 
 use strict;
-use Test::More tests => 19;
+use Test::More;
 use Data::Dumper;
 
 # checks against localtime will fail otherwise
 $ENV{'TZ'} = "CET";
 
 BEGIN {
+    if( $^O eq 'MSWin32' ) {
+        plan skip_all => 'windows is not supported';
+    }
+    else {
+        plan tests => 19;
+    }
+
     require 't/00_test_utils.pm';
     import TestUtils;
 }
@@ -118,17 +125,11 @@ my $result = $ma->calculate(
 is_deeply($result, $expected, 'host with services') or diag("got:\n".Dumper($result)."\nbut expected:\n".Dumper($expected));
 my $condensed_logs = $ma->get_condensed_logs();
 # test will fail on windows because of a different used timezone
-SKIP: {
-    skip("cannot test on windows, timezone is different", 1) if $^O eq "MSWin32";
-    TestUtils::check_array_one_by_one($expected_condensed_log, $condensed_logs, 'condensed logs');
-}
+TestUtils::check_array_one_by_one($expected_condensed_log, $condensed_logs, 'condensed logs');
 
 my $full_logs = $ma->get_full_logs();
 # test will fail on windows because of a different used timezone
-SKIP: {
-    skip("cannot test on windows, timezone is different", 13) if $^O eq "MSWin32";
-    TestUtils::check_array_one_by_one($expected_full_log, $full_logs, 'full logs');
-}
+TestUtils::check_array_one_by_one($expected_full_log, $full_logs, 'full logs');
 
 __DATA__
 [1262962252] Nagios 3.2.0 starting... (PID=7873)

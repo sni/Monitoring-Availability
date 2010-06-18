@@ -3,10 +3,17 @@
 #########################
 
 use strict;
-use Test::More tests => 3;
+use Test::More;
 use Data::Dumper;
 
 BEGIN {
+    if( $^O eq 'MSWin32' ) {
+        plan skip_all => 'windows is not supported';
+    }
+    else {
+        plan tests => 3;
+    }
+
     require 't/00_test_utils.pm';
     import TestUtils;
 }
