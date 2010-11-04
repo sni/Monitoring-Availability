@@ -2,7 +2,7 @@ use inc::Module::Install;
 
 name         'Monitoring-Availability';
 all_from     'lib/Monitoring/Availability.pm';
-perl_version '5.006';
+perl_version '5.008';
 license      'perl';
 
 requires 'Test::More'        => '0.87';

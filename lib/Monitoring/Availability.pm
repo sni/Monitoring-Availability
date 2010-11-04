@@ -1,6 +1,6 @@
 package Monitoring::Availability;
 
-use 5.006;
+use 5.008;
 use strict;
 use warnings;
 use Data::Dumper;
@@ -8,7 +8,7 @@ use Carp;
 use POSIX qw(strftime);
 use Monitoring::Availability::Logs;
 
-our $VERSION = '0.14';
+our $VERSION = '0.16';
 
 
 =head1 NAME
