@@ -1,5 +1,8 @@
 Revision history for Perl extension Monitoring::Availability.
 
+0.16  Fri Jun 18 13:18:29 CEST 2010
+    - added perl 5.8 requirement
+
 0.14  Fri Jun 18 11:53:49 CEST 2010
     - excluded some tests on windows hosts
 
