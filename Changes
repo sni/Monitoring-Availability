@@ -1,5 +1,8 @@
 Revision history for Perl extension Monitoring::Availability.
 
+0.20  Sun Jul 31 10:36:44 CEST 2011
+    - fixed problem with pending states in shinken
+
 0.18  Sat Apr 16 18:01:26 CEST 2011
     - fixed tests with use english
 
