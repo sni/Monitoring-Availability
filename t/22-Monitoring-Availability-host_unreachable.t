@@ -35,6 +35,7 @@ my $expected = {
 
             'time_indeterminate_nodata'     => 97550,
             'time_indeterminate_notrunning' => 0,
+            'time_indeterminate_outside_timeperiod' => 0,
         }
     }
 };

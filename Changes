@@ -1,5 +1,9 @@
 Revision history for Perl extension Monitoring::Availability.
 
+0.24  Fri Jan 27 00:34:03 CET 2012
+    - fixed timeperiod support
+    - report time outside timeperiods as extra item
+
 0.22  Thu Jan 26 01:10:58 CET 2012
     - added support for timeperiods (based on livestatus time transitions)
 

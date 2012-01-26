@@ -8,7 +8,7 @@ use Carp;
 use POSIX qw(strftime);
 use Monitoring::Availability::Logs;
 
-our $VERSION = '0.22';
+our $VERSION = '0.24';
 
 
 =head1 NAME
@@ -265,7 +265,7 @@ sub calculate {
         'log_livestatus'                 => undef,   # logs from a livestatus query
         'log_file'                       => undef,   # logs from a file
         'log_dir'                        => undef,   # logs from a dir
-        'rpttimeperiod'                  => $self->{'rpttimeperiod'},
+        'rpttimeperiod'                  => $self->{'rpttimeperiod'} || '',
         'assumeinitialstates'            => $self->{'assumeinitialstates'},
         'assumestateretention'           => $self->{'assumestateretention'},
         'assumestatesduringnotrunning'   => $self->{'assumestatesduringnotrunning'},
@@ -438,8 +438,9 @@ sub _set_empty_hosts {
             'scheduled_time_unreachable'    => 0,
             'scheduled_time_indeterminate'  => 0,
 
-            'time_indeterminate_nodata'     => 0,
-            'time_indeterminate_notrunning' => 0,
+            'time_indeterminate_nodata'             => 0,
+            'time_indeterminate_notrunning'         => 0,
+            'time_indeterminate_outside_timeperiod' => 0,
         };
         $self->{'host_data'}->{$hostname} = {
             'in_downtime'      => 0,
@@ -484,8 +485,9 @@ sub _set_empty_services {
                 'scheduled_time_critical'       => 0,
                 'scheduled_time_indeterminate'  => 0,
 
-                'time_indeterminate_nodata'     => 0,
-                'time_indeterminate_notrunning' => 0,
+                'time_indeterminate_nodata'             => 0,
+                'time_indeterminate_notrunning'         => 0,
+                'time_indeterminate_outside_timeperiod' => 0,
             };
 
             # create last service data
@@ -647,24 +649,6 @@ sub _process_log_line {
         return;
     }
 
-    # skip hosts we dont need
-    if($self->{'report_options'}->{'calc_all'} == 0 and defined $data->{'host_name'} and !defined $self->{'host_data'}->{$data->{'host_name'}} and !defined $self->{'service_data'}->{$data->{'host_name'}}) {
-        $self->_log('  -> skipped not needed host event') if $self->{'verbose'};
-        return;
-    }
-
-    # skip services we dont need
-    if($self->{'report_options'}->{'calc_all'} == 0
-       and defined $data->{'host_name'}
-       and defined $data->{'service_description'}
-       and $data->{'service_description'} ne ''
-       and !defined $self->{'service_data'}->{$data->{'host_name'}}->{$data->{'service_description'}}
-      ) {
-        $self->_log('  -> skipped not needed service event') if $self->{'verbose'};
-        return;
-    }
-
-
     # process starts / stops?
     if(defined $data->{'proc_start'}) {
         unless($self->{'report_options'}->{'assumestatesduringnotrunning'}) {
@@ -727,8 +711,64 @@ sub _process_log_line {
         }
     }
 
+    # timeperiod transitions
+    elsif(    defined $data->{'timeperiod'} ) {
+        if($self->{'report_options'}->{'rpttimeperiod'} eq $data->{'timeperiod'} ) {
+            $self->_log('_process_log_line() timeperiod translation, inserting fake event for all hosts/services') if $self->{'verbose'};
+            for my $host_name (keys %{$self->{'service_data'}}) {
+                for my $service_description (keys %{$self->{'service_data'}->{$host_name}}) {
+                    my $last_known_state = $self->{'service_data'}->{$host_name}->{$service_description}->{'last_known_state'};
+                    my $last_state = STATE_UNSPECIFIED;
+                    $last_state = $last_known_state if defined $last_known_state and $last_known_state >= 0;
+                    $self->_set_service_event($host_name, $service_description, $result, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'}, 'state' => $last_state });
+                }
+            }
+            for my $host_name (keys %{$self->{'host_data'}}) {
+                my $last_known_state = $self->{'host_data'}->{$host_name}->{'last_known_state'};
+                my $last_state = STATE_UNSPECIFIED;
+                $last_state = $last_known_state if defined $last_known_state and $last_known_state >= 0;
+                $self->_set_host_event($host_name, $result, { 'time' => $data->{'time'}, 'state' => $last_state });
+            }
+            $self->{'in_timeperiod'} = $data->{'to'};
+
+            # set a log entry
+            my $start         = 'STOP';
+            my $plugin_output = 'leaving timeperiod: '.$data->{'timeperiod'};
+            if($self->{'in_timeperiod'}) {
+                $plugin_output = 'entering timeperiod: '.$data->{'timeperiod'};
+                $start         = 'START';
+            }
+            $self->_add_log_entry(
+                            'full_only'   => 1,
+                            'log'         => {
+                                'start'         => $data->{'time'},
+                                'type'          => 'TIMEPERIOD '.$start,
+                                'plugin_output' => $plugin_output,
+                                'class'         => 'INDETERMINATE',
+                            },
+            );
+        }
+    }
+
+    # skip hosts we dont need
+    if($self->{'report_options'}->{'calc_all'} == 0 and defined $data->{'host_name'} and !defined $self->{'host_data'}->{$data->{'host_name'}} and !defined $self->{'service_data'}->{$data->{'host_name'}}) {
+        $self->_log('  -> skipped not needed host event') if $self->{'verbose'};
+        return;
+    }
+
+    # skip services we dont need
+    if($self->{'report_options'}->{'calc_all'} == 0
+       and defined $data->{'host_name'}
+       and defined $data->{'service_description'}
+       and $data->{'service_description'} ne ''
+       and !defined $self->{'service_data'}->{$data->{'host_name'}}->{$data->{'service_description'}}
+      ) {
+        $self->_log('  -> skipped not needed service event') if $self->{'verbose'};
+        return;
+    }
+
     # service events
-    elsif(defined $data->{'service_description'} and $data->{'service_description'} ne '') {
+    if(defined $data->{'service_description'} and $data->{'service_description'} ne '') {
         my $service_hist = $self->{'service_data'}->{$data->{'host_name'}}->{$data->{'service_description'}};
 
         if($data->{'type'} eq 'CURRENT SERVICE STATE' or $data->{'type'} eq 'SERVICE ALERT' or $data->{'type'} eq 'INITIAL SERVICE STATE') {
@@ -856,47 +896,6 @@ sub _process_log_line {
             $self->_log('  -> unknown log type') if $self->{'verbose'};
         }
     }
-
-    # timeperiod transitions
-    elsif(    defined $data->{'timeperiod'}
-          and defined $self->{'report_options'}->{'rpttimeperiod'}
-          and $data->{'timeperiod'} eq $self->{'report_options'}->{'rpttimeperiod'}) {
-
-        $self->_log('_process_log_line() timeperiod translation, inserting fake event for all hosts/services') if $self->{'verbose'};
-        for my $host_name (keys %{$self->{'service_data'}}) {
-            for my $service_description (keys %{$self->{'service_data'}->{$host_name}}) {
-                my $last_known_state = $self->{'service_data'}->{$host_name}->{$service_description}->{'last_known_state'};
-                my $last_state = STATE_UNSPECIFIED;
-                $last_state = $last_known_state if defined $last_known_state and $last_known_state >= 0;
-                $self->_set_service_event($host_name, $service_description, $result, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'}, 'state' => $last_state });
-            }
-        }
-        for my $host_name (keys %{$self->{'host_data'}}) {
-            my $last_known_state = $self->{'host_data'}->{$host_name}->{'last_known_state'};
-            my $last_state = STATE_UNSPECIFIED;
-            $last_state = $last_known_state if defined $last_known_state and $last_known_state >= 0;
-            $self->_set_host_event($host_name, $result, { 'time' => $data->{'time'}, 'state' => $last_state });
-        }
-        $self->{'in_timeperiod'} = $data->{'to'};
-
-        # set a log entry
-        my $start         = 'STOP';
-        my $plugin_output = 'leaving timeperiod: '.$data->{'timeperiod'};
-        if($self->{'in_timeperiod'}) {
-            $plugin_output = 'entering timeperiod: '.$data->{'timeperiod'};
-            $start         = 'START';
-        }
-        $self->_add_log_entry(
-                        'full_only'   => 1,
-                        'log'         => {
-                            'start'         => $data->{'time'},
-                            'type'          => 'TIMEPERIOD '.$start,
-                            'plugin_output' => $plugin_output,
-                            'class'         => 'INDETERMINATE',
-                        },
-        );
-    }
-
     else {
         $self->_log('  -> unknown log type') if $self->{'verbose'};
     }
@@ -922,11 +921,17 @@ sub _set_service_event {
     # check if we are inside the report time
     if($self->{'report_options'}->{'start'} < $data->{'time'} and $self->{'report_options'}->{'end'} >= $data->{'time'}) {
         # we got a last state?
-        if(defined $service_hist->{'last_state'} and (!defined $self->{'in_timeperiod'} or $self->{'in_timeperiod'})) {
+        if(defined $service_hist->{'last_state'}) {
             my $diff = $data->{'time'} - $service_hist->{'last_state_time'};
 
+            # outside timeperiod
+            if(defined $self->{'in_timeperiod'} and !$self->{'in_timeperiod'}) {
+                $self->_log('_set_service_event() outside timeperiod + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
+                $service_data->{'time_indeterminate_outside_timeperiod'} += $diff;
+            }
+
             # ok
-            if($service_hist->{'last_state'} == STATE_OK) {
+            elsif($service_hist->{'last_state'} == STATE_OK) {
                 $self->_log('_set_service_event() ok + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
                 $service_data->{'time_ok'} += $diff;
                 if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
@@ -1013,11 +1018,17 @@ sub _set_host_event {
     # check if we are inside the report time
     if($self->{'report_options'}->{'start'} < $data->{'time'} and $self->{'report_options'}->{'end'} >= $data->{'time'}) {
         # we got a last state?
-        if(defined $host_hist->{'last_state'} and (!defined $self->{'in_timeperiod'} or $self->{'in_timeperiod'})) {
+        if(defined $host_hist->{'last_state'}) {
             my $diff = $data->{'time'} - $host_hist->{'last_state_time'};
 
+            # outside timeperiod
+            if(defined $self->{'in_timeperiod'} and !$self->{'in_timeperiod'}) {
+                $self->_log('_set_host_event() outside timeperiod + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
+                $host_data->{'time_indeterminate_outside_timeperiod'} += $diff;
+            }
+
             # up
-            if($host_hist->{'last_state'} == STATE_UP) {
+            elsif($host_hist->{'last_state'} == STATE_UP) {
                 $self->_log('_set_host_event() up + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
                 $host_data->{'time_up'} += $diff;
                 if($host_hist->{'in_downtime'}) {

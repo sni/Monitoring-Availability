@@ -60,6 +60,7 @@ my $expected = {
 
                 'time_indeterminate_nodata'     => 0,
                 'time_indeterminate_notrunning' => 0,
+                'time_indeterminate_outside_timeperiod' => 0,
             }
         }
     }
@@ -118,6 +119,7 @@ $expected_full_log = [
 ];
 $expected->{'services'}->{'testhost'}->{'testservice'}->{'time_ok'}       = 220;
 $expected->{'services'}->{'testhost'}->{'testservice'}->{'time_critical'} = 10;
+$expected->{'services'}->{'testhost'}->{'testservice'}->{'time_indeterminate_outside_timeperiod'} = 70;
 $options->{'rpttimeperiod'} = 'workhours';
 $ma = Monitoring::Availability->new(%{$options});
 isa_ok($ma, 'Monitoring::Availability', 'create new Monitoring::Availability object');

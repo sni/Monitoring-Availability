@@ -265,7 +265,9 @@ sub _set_from_options {
     }
 
     # Timeperiod Transitions
-    elsif($data->{'type'} eq 'TIMEPERIOD TRANSITION') {
+    # livestatus does not parse this correct, so we have to use regex
+    elsif($data->{'type'} =~ m/^TIMEPERIOD\ TRANSITION/mx) {
+        $data->{'type'}       = 'TIMEPERIOD TRANSITION';
         $data->{'timeperiod'} = $self->_strtok($string, ';');
         $data->{'from'}       = $self->_strtok($string, ';');
         $data->{'to'}         = $self->_strtok($string, ';');
