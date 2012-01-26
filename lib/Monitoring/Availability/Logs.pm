@@ -264,6 +264,13 @@ sub _set_from_options {
         $data->{'start'}               = $self->_startstr_to_start($self->_strtok($string, ';'));
     }
 
+    # Timeperiod Transitions
+    elsif($data->{'type'} eq 'TIMEPERIOD TRANSITION') {
+        $data->{'timeperiod'} = $self->_strtok($string, ';');
+        $data->{'from'}       = $self->_strtok($string, ';');
+        $data->{'to'}         = $self->_strtok($string, ';');
+    }
+
     return 1;
 }
 

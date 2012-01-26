@@ -1,5 +1,8 @@
 Revision history for Perl extension Monitoring::Availability.
 
+0.22  Thu Jan 26 01:10:58 CET 2012
+    - added support for timeperiods (based on livestatus time transitions)
+
 0.20  Sun Jul 31 10:36:44 CEST 2011
     - fixed problem with pending states in shinken
 
