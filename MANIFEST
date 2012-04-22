@@ -34,6 +34,7 @@ t/30-Monitoring-Availability-service_with_hostdowntimes.t
 t/31-Monitoring-Availability-host_with_services.t
 t/32-Monitoring-Availability-service.t
 t/33-Monitoring-Availability-service_ok_logs.t
+t/34-Monitoring-Availability-breakdown.t
 t/34-timeperiods.t
 t/97-Pod.t
 t/98-Pod-Coverage.t

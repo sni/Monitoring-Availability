@@ -8,7 +8,7 @@ use Carp;
 use POSIX qw(strftime);
 use Monitoring::Availability::Logs;
 
-our $VERSION = '0.24';
+our $VERSION = '0.26';
 
 
 =head1 NAME
@@ -88,6 +88,10 @@ Time format for the log output, default: %s
 
 verbose mode
 
+=item breakdown
+
+Breakdown availability into 'months', 'weeks', 'days', 'none'
+
 =back
 
 =cut
@@ -116,6 +120,11 @@ use constant {
 
     HOST_ONLY           => 2,
     SERVICE_ONLY        => 3,
+
+    BREAK_NONE          => 0,
+    BREAK_DAYS          => 1,
+    BREAK_WEEKS         => 2,
+    BREAK_MONTHS        => 3,
 };
 
 sub new {
@@ -135,6 +144,7 @@ sub new {
         'initialassumedservicestate'     => undef,
         'backtrack'                      => undef,
         'showscheduleddowntime'          => undef,
+        'breakdown'                      => undef,
     };
 
     bless $self, $class;
@@ -275,6 +285,7 @@ sub calculate {
         'backtrack'                      => $self->{'backtrack'},
         'showscheduleddowntime'          => $self->{'showscheduleddowntime'},
         'timeformat'                     => $self->{'timeformat'},
+        'breakdown'                      => $self->{'breakdown'},
     };
     $self->_log('calculate()') if $self->{'verbose'};
     my $result;
@@ -428,20 +439,7 @@ sub _set_empty_hosts {
             if($@) { croak("found no initial state for host '$hostname'\ngot: ".Dumper($self->{'report_options'}->{'initial_states'}).Dumper($@)); }
             $self->{'report_options'}->{'first_state'} = $first_state;
         }
-        $data->{'hosts'}->{$hostname} = {
-            'time_up'           => 0,
-            'time_down'         => 0,
-            'time_unreachable'  => 0,
-
-            'scheduled_time_up'             => 0,
-            'scheduled_time_down'           => 0,
-            'scheduled_time_unreachable'    => 0,
-            'scheduled_time_indeterminate'  => 0,
-
-            'time_indeterminate_nodata'             => 0,
-            'time_indeterminate_notrunning'         => 0,
-            'time_indeterminate_outside_timeperiod' => 0,
-        };
+        $data->{'hosts'}->{$hostname} = $self->_new_host_data($self->{'report_options'}->{'breakdown'});
         $self->{'host_data'}->{$hostname} = {
             'in_downtime'      => 0,
             'last_state'       => $initial_assumend_state,
@@ -473,22 +471,7 @@ sub _set_empty_services {
                 if($@) { croak("found no initial state for service '$service_description' on host '$hostname'\ngot: ".Dumper($self->{'report_options'}->{'initial_states'}).Dumper($@)); }
                 $self->{'report_options'}->{'first_state'} = $first_state;
             }
-            $data->{'services'}->{$hostname}->{$service_description} = {
-                'time_ok'           => 0,
-                'time_warning'      => 0,
-                'time_unknown'      => 0,
-                'time_critical'     => 0,
-
-                'scheduled_time_ok'             => 0,
-                'scheduled_time_warning'        => 0,
-                'scheduled_time_unknown'        => 0,
-                'scheduled_time_critical'       => 0,
-                'scheduled_time_indeterminate'  => 0,
-
-                'time_indeterminate_nodata'             => 0,
-                'time_indeterminate_notrunning'         => 0,
-                'time_indeterminate_outside_timeperiod' => 0,
-            };
+            $data->{'services'}->{$hostname}->{$service_description} = $self->_new_service_data($self->{'report_options'}->{'breakdown'});
 
             # create last service data
             $self->{'service_data'}->{$hostname}->{$service_description} = {
@@ -926,64 +909,37 @@ sub _set_service_event {
 
             # outside timeperiod
             if(defined $self->{'in_timeperiod'} and !$self->{'in_timeperiod'}) {
-                $self->_log('_set_service_event() outside timeperiod + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
-                $service_data->{'time_indeterminate_outside_timeperiod'} += $diff;
+                $self->_add_time($service_data, $data->{'time'}, 'time_indeterminate_outside_timeperiod', $diff);
             }
 
             # ok
             elsif($service_hist->{'last_state'} == STATE_OK) {
-                $self->_log('_set_service_event() ok + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
-                $service_data->{'time_ok'} += $diff;
-                if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
-                    $self->_log('_set_service_event() ok sched + '.$diff.' seconds') if $self->{'verbose'};
-                    $service_data->{'scheduled_time_ok'} += $diff
-                }
+                $self->_add_time($service_data, $data->{'time'}, 'time_ok', $diff, ($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}));
             }
 
             # warning
             elsif($service_hist->{'last_state'} == STATE_WARNING) {
-                $self->_log('_set_service_event() warning + '.$diff.' seconds') if $self->{'verbose'};
-                $service_data->{'time_warning'} += $diff;
-                if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
-                    $self->_log('_set_service_event() warning sched + '.$diff.' seconds') if $self->{'verbose'};
-                    $service_data->{'scheduled_time_warning'} += $diff
-                }
+                $self->_add_time($service_data, $data->{'time'}, 'time_warning', $diff, ($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}));
             }
 
             # critical
             elsif($service_hist->{'last_state'} == STATE_CRITICAL) {
-                $self->_log('_set_service_event() critical + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
-                $service_data->{'time_critical'} += $diff;
-                if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
-                    $self->_log('_set_service_event() critical sched + '.$diff.' seconds') if $self->{'verbose'};
-                    $service_data->{'scheduled_time_critical'} += $diff
-                }
+                $self->_add_time($service_data, $data->{'time'}, 'time_critical', $diff, ($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}));
             }
 
             # unknown
             elsif($service_hist->{'last_state'} == STATE_UNKNOWN) {
-                $self->_log('_set_service_event() unknown + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
-                $service_data->{'time_unknown'} += $diff;
-                if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
-                    $self->_log('_set_service_event() unknown sched + '.$diff.' seconds') if $self->{'verbose'};
-                    $service_data->{'scheduled_time_unknown'} += $diff
-                }
+                $self->_add_time($service_data, $data->{'time'}, 'time_unknown', $diff, ($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}));
             }
 
             # no data yet
             elsif($service_hist->{'last_state'} == STATE_UNSPECIFIED) {
-                $self->_log('_set_service_event() indeterminate + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
-                $service_data->{'time_indeterminate_nodata'} += $diff;
-                if($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}) {
-                    $self->_log('_set_service_event() indeterminate sched + '.$diff.' seconds') if $self->{'verbose'};
-                    $service_data->{'scheduled_time_indeterminate'} += $diff
-                }
+                $self->_add_time($service_data, $data->{'time'}, 'time_indeterminate_nodata', $diff, ($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}), 'scheduled_time_indeterminate');
             }
 
             # not running
             elsif($service_hist->{'last_state'} == STATE_NOT_RUNNING) {
-                $self->_log('_set_service_event() not_running + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
-                $service_data->{'time_indeterminate_notrunning'} += $diff;
+                $self->_add_time($service_data, $data->{'time'}, 'time_indeterminate_notrunning', $diff);
             }
 
         }
@@ -1023,54 +979,32 @@ sub _set_host_event {
 
             # outside timeperiod
             if(defined $self->{'in_timeperiod'} and !$self->{'in_timeperiod'}) {
-                $self->_log('_set_host_event() outside timeperiod + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
-                $host_data->{'time_indeterminate_outside_timeperiod'} += $diff;
+                $self->_add_time($host_data, $data->{'time'}, 'time_indeterminate_outside_timeperiod', $diff);
             }
 
             # up
             elsif($host_hist->{'last_state'} == STATE_UP) {
-                $self->_log('_set_host_event() up + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
-                $host_data->{'time_up'} += $diff;
-                if($host_hist->{'in_downtime'}) {
-                    $self->_log('_set_host_event() up sched + '.$diff.' seconds') if $self->{'verbose'};
-                    $host_data->{'scheduled_time_up'} += $diff
-                }
+                $self->_add_time($host_data, $data->{'time'}, 'time_up', $diff, $host_hist->{'in_downtime'});
             }
 
             # down
             elsif($host_hist->{'last_state'} == STATE_DOWN) {
-                $self->_log('_set_host_event() down + '.$diff.' seconds') if $self->{'verbose'};
-                $host_data->{'time_down'} += $diff;
-                if($host_hist->{'in_downtime'}) {
-                    $self->_log('_set_host_event() down sched + '.$diff.' seconds') if $self->{'verbose'};
-                    $host_data->{'scheduled_time_down'} += $diff
-                }
+                $self->_add_time($host_data, $data->{'time'}, 'time_down', $diff, $host_hist->{'in_downtime'});
             }
 
             # unreachable
             elsif($host_hist->{'last_state'} == STATE_UNREACHABLE) {
-                $self->_log('_set_host_event() unreachable + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
-                $host_data->{'time_unreachable'} += $diff;
-                if($host_hist->{'in_downtime'}) {
-                    $self->_log('_set_host_event() unreachable sched + '.$diff.' seconds') if $self->{'verbose'};
-                    $host_data->{'scheduled_time_unreachable'} += $diff
-                }
+                $self->_add_time($host_data, $data->{'time'}, 'time_unreachable', $diff, $host_hist->{'in_downtime'});
             }
 
             # no data yet
             elsif($host_hist->{'last_state'} == STATE_UNSPECIFIED) {
-                $self->_log('_set_host_event() indeterminate + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
-                $host_data->{'time_indeterminate_nodata'} += $diff;
-                if($host_hist->{'in_downtime'}) {
-                    $self->_log('_set_host_event() indeterminate sched + '.$diff.' seconds') if $self->{'verbose'};
-                    $host_data->{'scheduled_time_indeterminate'} += $diff
-                }
+                $self->_add_time($host_data, $data->{'time'}, 'time_indeterminate_nodata', $diff, $host_hist->{'in_downtime'}, 'scheduled_time_indeterminate');
             }
 
             # not running
             elsif($host_hist->{'last_state'} == STATE_NOT_RUNNING) {
-                $self->_log('_set_host_event() not_running + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
-                $host_data->{'time_indeterminate_notrunning'} += $diff;
+                $self->_add_time($host_data, $data->{'time'}, 'time_indeterminate_notrunning', $diff);
             }
         }
     }
@@ -1085,6 +1019,29 @@ sub _set_host_event {
     $host_hist->{'last_state_time'} = $data->{'time'};
 
     return 1;
+}
+
+########################################
+sub _add_time {
+    my($self, $data, $date, $type, $diff, $in_downtime, $scheduled_type) = @_;
+    $scheduled_type = 'scheduled_'.$type unless defined $scheduled_type;
+    $self->_log('_add_time() '.$type.' + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
+    $data->{$type} += $diff;
+    if($in_downtime) {
+        $self->_log('_add_time() '.$type.' sched + '.$diff.' seconds') if $self->{'verbose'};
+        $data->{$scheduled_type} += $diff;
+    }
+
+    # breakdowns?
+    if($self->{'report_options'}->{'breakdown'} != BREAK_NONE) {
+        my($fmt, $timespan) = $self->_get_break_config();
+        my $timestr = strftime($fmt, localtime($date-1));
+        $data->{'breakdown'}->{$timestr}->{$type} += $diff;
+        if($in_downtime) {
+            $data->{'breakdown'}->{$timestr}->{$scheduled_type} += $diff;
+        }
+    }
+    return;
 }
 
 
@@ -1227,6 +1184,7 @@ sub _set_default_options {
     $options->{'initialassumedservicestate'}     = 'unspecified' unless defined $options->{'initialassumedservicestate'};
     $options->{'showscheduleddowntime'}          = 'yes'         unless defined $options->{'showscheduleddowntime'};
     $options->{'timeformat'}                     = '%s'          unless defined $options->{'timeformat'};
+    $options->{'breakdown'}                      = BREAK_NONE    unless defined $options->{'breakdown'};
 
     return $options;
 }
@@ -1306,6 +1264,31 @@ sub _verify_options {
         }
         else {
             croak('initialassumedservicestate unknown, please use one of: unspecified, current, ok, warning, unknown or critical. Got: '.$options->{'initialassumedservicestate'});
+        }
+    }
+
+    # set breakdown
+    if(defined $options->{'breakdown'}) {
+        if(lc $options->{'breakdown'} eq 'months') {
+            $options->{'breakdown'} = BREAK_MONTHS;
+        }
+        elsif(lc $options->{'breakdown'} eq 'weeks') {
+            $options->{'breakdown'} = BREAK_WEEKS;
+        }
+        elsif(lc $options->{'breakdown'} eq 'days') {
+            $options->{'breakdown'} = BREAK_DAYS;
+        }
+        elsif(lc $options->{'breakdown'} eq 'none') {
+            $options->{'breakdown'} = BREAK_NONE;
+        }
+        elsif(   $options->{'breakdown'} == BREAK_NONE
+           or $options->{'breakdown'} == BREAK_DAYS
+           or $options->{'breakdown'} == BREAK_WEEKS
+           or $options->{'breakdown'} == BREAK_MONTHS) {
+            # ok
+        }
+        else {
+            croak('breakdown unknown, please use one of: months, weeks, days or none. Got: '.$options->{'breakdown'});
         }
     }
 
@@ -1447,6 +1430,85 @@ sub _state_to_int {
 }
 
 ########################################
+sub _new_service_data {
+    my($self, $breakdown) = @_;
+    my $data = {
+        time_ok           => 0,
+        time_warning      => 0,
+        time_unknown      => 0,
+        time_critical     => 0,
+
+        scheduled_time_ok             => 0,
+        scheduled_time_warning        => 0,
+        scheduled_time_unknown        => 0,
+        scheduled_time_critical       => 0,
+        scheduled_time_indeterminate  => 0,
+
+        time_indeterminate_nodata             => 0,
+        time_indeterminate_notrunning         => 0,
+        time_indeterminate_outside_timeperiod => 0,
+    };
+    if($breakdown != BREAK_NONE) {
+        $data->{'breakdown'} = {};
+        my($fmt, $timespan) = $self->_get_break_config();
+        my $cur = $self->{'report_options'}->{'start'};
+        while($cur < $self->{'report_options'}->{'end'}) {
+            my $timestr = strftime($fmt, localtime($cur));
+            $data->{'breakdown'}->{$timestr} = $self->_new_service_data(BREAK_NONE);
+            $cur = $cur + $timespan;
+        }
+    }
+    return $data;
+}
+
+########################################
+sub _new_host_data {
+    my($self, $breakdown) = @_;
+    my $data = {
+        time_up           => 0,
+        time_down         => 0,
+        time_unreachable  => 0,
+
+        scheduled_time_up             => 0,
+        scheduled_time_down           => 0,
+        scheduled_time_unreachable    => 0,
+        scheduled_time_indeterminate  => 0,
+
+        time_indeterminate_nodata             => 0,
+        time_indeterminate_notrunning         => 0,
+        time_indeterminate_outside_timeperiod => 0,
+    };
+    if($breakdown != BREAK_NONE) {
+        $data->{'breakdown'} = {};
+        my($fmt, $timespan) = $self->_get_break_config();
+        my $cur = $self->{'report_options'}->{'start'};
+        while($cur < $self->{'report_options'}->{'end'}) {
+            my $timestr = strftime($fmt, localtime($cur));
+            $data->{'breakdown'}->{$timestr} = $self->_new_host_data(BREAK_NONE);
+            $cur = $cur + $timespan;
+        }
+    }
+    return $data;
+}
+
+########################################
+sub _get_break_config {
+    my($self) = @_;
+    my($fmt, $timespan);
+    if($self->{'report_options'}->{'breakdown'} == BREAK_DAYS) {
+        $fmt      = '%Y-%m-%d';
+        $timespan = 86400;
+    }
+    elsif($self->{'report_options'}->{'breakdown'} == BREAK_WEEKS) {
+        $fmt      = '%Y-%V';
+        $timespan = 86400 * 7;
+    }
+    elsif($self->{'report_options'}->{'breakdown'} == BREAK_MONTHS) {
+        $fmt      = '%Y-%m';
+        $timespan = 86400 * 30;
+    }
+    return($fmt, $timespan);
+}
 
 1;
 
