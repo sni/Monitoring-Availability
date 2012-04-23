@@ -4,7 +4,7 @@
       "Sven Nierlein, <nierlein@cpan.org>"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "Module::Install version 1.00, CPAN::Meta::Converter version 2.112150",
+   "generated_by" : "Module::Install version 1.01, CPAN::Meta::Converter version 2.112150",
    "license" : [
       "perl_5"
    ],
@@ -43,5 +43,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "0.24"
+   "version" : "0.26"
 }

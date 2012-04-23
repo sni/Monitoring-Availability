@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 use Carp;
-use POSIX qw(strftime);
+use POSIX qw(strftime mktime);
 use Monitoring::Availability::Logs;
 
 our $VERSION = '0.26';
@@ -91,6 +91,8 @@ verbose mode
 =item breakdown
 
 Breakdown availability into 'months', 'weeks', 'days', 'none'
+
+adds additional 'breakdown' hash to each result with broken down results
 
 =back
 
@@ -340,6 +342,8 @@ sub calculate {
         $self->_set_empty_services($result);
     }
 
+    $self->_set_breakpoints();
+
     # read in logs
     if(defined $self->{'report_options'}->{'log_string'} or $self->{'report_options'}->{'log_file'} or $self->{'report_options'}->{'log_dir'}) {
         my $mal = Monitoring::Availability::Logs->new(
@@ -505,12 +509,20 @@ sub _compute_for_data {
 
     # if we reach the start date of our report, insert a fake entry
     if($last_time < $self->{'report_options'}->{'start'} and $data->{'time'} > $self->{'report_options'}->{'start'}) {
-        $self->_insert_fake_start_event($result);
+        $self->_insert_fake_event($result, $self->{'report_options'}->{'start'});
+    }
+
+    # if we passed a breakdown point, insert fake event
+    if($self->{'report_options'}->{'breakdown'} != BREAK_NONE) {
+        my $breakpoint = $self->{'breakpoints'}->[0];
+        if(defined $breakpoint and $last_time < $breakpoint and $data->{'time'} > $breakpoint) {
+            $self->_insert_fake_event($result, $breakpoint);
+        }
     }
 
     # end of report reached, insert fake end event
     if($data->{'time'} >= $self->{'report_options'}->{'end'} and $last_time < $self->{'report_options'}->{'end'}) {
-        $self->_insert_fake_end_event($result);
+        $self->_insert_fake_event($result, $self->{'report_options'}->{'end'});
 
         # set a log entry
         $self->_add_log_entry(
@@ -603,12 +615,12 @@ sub _add_last_time_event {
 
     # no start event yet, insert a fake entry
     if($last_time < $self->{'report_options'}->{'start'}) {
-        $self->_insert_fake_start_event($result);
+        $self->_insert_fake_event($result, $self->{'report_options'}->{'start'});
     }
 
     # no end event yet, insert fake end event
     if($last_time < $self->{'report_options'}->{'end'}) {
-        $self->_insert_fake_end_event($result);
+        $self->_insert_fake_event($result, $self->{'report_options'}->{'end'});
     }
 
     return 1;
@@ -1094,11 +1106,12 @@ sub _duration {
 }
 
 ########################################
-sub _insert_fake_start_event {
+sub _insert_fake_event {
     my $self    = shift;
     my $result  = shift;
+    my $time    = shift;
 
-    $self->_log('_insert_fake_start_event()') if $self->{'verbose'};
+    $self->_log('_insert_fake_event()') if $self->{'verbose'};
     for my $host (keys %{$result->{'services'}}) {
         for my $service (keys %{$result->{'services'}->{$host}}) {
             my $last_service_state = STATE_UNSPECIFIED;
@@ -1107,7 +1120,7 @@ sub _insert_fake_start_event {
             }
             my $fakedata = {
                 'service_description' => $service,
-                'time'                => $self->{'report_options'}->{'start'},
+                'time'                => $time,
                 'host_name'           => $host,
                 'type'                => 'INITIAL SERVICE STATE',
                 'hard'                => 1,
@@ -1123,46 +1136,11 @@ sub _insert_fake_start_event {
             $last_host_state = $self->{'host_data'}->{$host}->{'last_state'};
         }
         my $fakedata = {
-            'time'                => $self->{'report_options'}->{'start'},
+            'time'                => $time,
             'host_name'           => $host,
             'type'                => 'INITIAL HOST STATE',
             'hard'                => 1,
             'state'               => $last_host_state,
-        };
-        $self->_set_host_event($host, $result, $fakedata);
-    }
-
-    return 1;
-}
-
-########################################
-sub _insert_fake_end_event {
-    my $self    = shift;
-    my $result  = shift;
-
-    # process a fake last entry with our last known state
-    $self->_log('_insert_fake_end_event()') if $self->{'verbose'};
-    for my $host (keys %{$result->{'services'}}) {
-        for my $service (keys %{$result->{'services'}->{$host}}) {
-            my $fakedata = {
-                'service_description' => $service,
-                'time'                => $self->{'report_options'}->{'end'},
-                'host_name'           => $host,
-                'type'                => 'INITIAL SERVICE STATE',
-                'hard'                => 1,
-                'state'               => $self->{'service_data'}->{$host}->{$service}->{'last_state'},
-            };
-            $self->_set_service_event($host, $service, $result, $fakedata);
-        }
-    }
-
-    for my $host (keys %{$result->{'hosts'}}) {
-        my $fakedata = {
-            'time'                => $self->{'report_options'}->{'end'},
-            'host_name'           => $host,
-            'type'                => 'INITIAL HOST STATE',
-            'hard'                => 1,
-            'state'               => $self->{'host_data'}->{$host}->{'last_state'},
         };
         $self->_set_host_event($host, $result, $fakedata);
     }
@@ -1500,7 +1478,7 @@ sub _get_break_config {
         $timespan = 86400;
     }
     elsif($self->{'report_options'}->{'breakdown'} == BREAK_WEEKS) {
-        $fmt      = '%Y-%V';
+        $fmt      = '%Y-KW%V';
         $timespan = 86400 * 7;
     }
     elsif($self->{'report_options'}->{'breakdown'} == BREAK_MONTHS) {
@@ -1509,6 +1487,26 @@ sub _get_break_config {
     }
     return($fmt, $timespan);
 }
+
+########################################
+sub _set_breakpoints {
+    my($self) = @_;
+    $self->{'breakpoints'} = [];
+
+    return if $self->{'report_options'}->{'breakdown'} == BREAK_NONE;
+
+    my $cur = $self->{'report_options'}->{'start'};
+    # round to next 0:00
+    my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($cur);
+    $cur = mktime(0, 0, 0, $mday, $mon, $year) + 86400;
+    while($cur < $self->{'report_options'}->{'end'}) {
+        push @{$self->{'breakpoints'}}, $cur;
+        $cur = $cur + 86400;
+    }
+    return;
+}
+
+########################################
 
 1;
 
