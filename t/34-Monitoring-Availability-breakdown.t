@@ -6,6 +6,9 @@ use strict;
 use Test::More tests => 3;
 use Data::Dumper;
 
+# checks against localtime will fail otherwise
+$ENV{'TZ'} = "CET";
+
 BEGIN {
     require 't/00_test_utils.pm';
     import TestUtils;
