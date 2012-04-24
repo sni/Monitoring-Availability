@@ -7,7 +7,9 @@ use Test::More;
 use Data::Dumper;
 
 # checks against localtime will fail otherwise
+use POSIX qw(tzset);
 $ENV{'TZ'} = "CET";
+POSIX::tzset();
 
 BEGIN {
     if( $^O eq 'MSWin32' ) {
