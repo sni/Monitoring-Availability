@@ -14,7 +14,7 @@ our $VERSION = '0.27_2';
 =head1 NAME
 
 Monitoring::Availability - Calculate Availability Data from
-Nagios and Icinga Logfiles.
+Nagios / Icinga and Shinken Logfiles.
 
 =head1 SYNOPSIS
 

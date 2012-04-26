@@ -2,7 +2,7 @@ Monitoring-Availability
 =======================
 
     Monitoring::Availability can be used to calculate the availability based
-    on Nagios / Icinga Logfiles.
+    on Nagios / Icinga and Shinken Logfiles.
 
 INSTALLATION
 
