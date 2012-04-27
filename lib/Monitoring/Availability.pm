@@ -1498,7 +1498,7 @@ sub _set_breakpoints {
     my $cur = $self->{'report_options'}->{'start'};
     # round to next 0:00
     my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($cur);
-    $cur = mktime(0, 0, 0, $mday, $mon, $year) + 86400;
+    $cur = mktime(0, 0, 0, $mday, $mon, $year, $wday, $yday, $isdst) + 86400;
     while($cur < $self->{'report_options'}->{'end'}) {
         push @{$self->{'breakpoints'}}, $cur;
         $cur = $cur + 86400;
