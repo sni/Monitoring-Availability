@@ -1247,7 +1247,10 @@ sub _verify_options {
 
     # set breakdown
     if(defined $options->{'breakdown'}) {
-        if(lc $options->{'breakdown'} eq 'months') {
+        if(lc $options->{'breakdown'} eq '') {
+            $options->{'breakdown'} = BREAK_NONE;
+        }
+        elsif(lc $options->{'breakdown'} eq 'months') {
             $options->{'breakdown'} = BREAK_MONTHS;
         }
         elsif(lc $options->{'breakdown'} eq 'weeks') {
