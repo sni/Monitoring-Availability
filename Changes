@@ -1,5 +1,11 @@
 Revision history for Perl extension Monitoring::Availability.
 
+0.30  Mon Apr 30 17:35:04 CEST 2012
+    - fixed breakdown support when no events happen between breakpoints
+
+0.28  Mon Apr 30 17:35:04 CEST 2012
+    - fixed breakdown support on bsd systems
+
 0.26  Mon Apr 23 17:23:24 CEST 2012
     - added breakdown support
 
