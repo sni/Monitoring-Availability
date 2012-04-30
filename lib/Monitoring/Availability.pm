@@ -515,8 +515,11 @@ sub _compute_for_data {
     # if we passed a breakdown point, insert fake event
     if($self->{'report_options'}->{'breakdown'} != BREAK_NONE) {
         my $breakpoint = $self->{'breakpoints'}->[0];
-        if(defined $breakpoint and $last_time < $breakpoint and $data->{'time'} > $breakpoint) {
+        while(defined $breakpoint and $last_time < $breakpoint and $data->{'time'} > $breakpoint) {
+            $self->_log('_compute_for_data(): inserted breakpoint: '.$breakpoint);
             $self->_insert_fake_event($result, $breakpoint);
+            shift(@{$self->{'breakpoints'}});
+            $breakpoint = $self->{'breakpoints'}->[0];
         }
     }
 
@@ -654,14 +657,14 @@ sub _process_log_line {
                     for my $service_description (keys %{$self->{'service_data'}->{$host_name}}) {
                         my $last_known_state = $self->{'service_data'}->{$host_name}->{$service_description}->{'last_known_state'};
                         my $last_state = STATE_UNSPECIFIED;
-                        $last_state = $last_known_state if defined $last_known_state and $last_known_state >= 0;
+                        $last_state = $last_known_state if(defined $last_known_state and $last_known_state >= 0);
                         $self->_set_service_event($host_name, $service_description, $result, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'}, 'state' => $last_state });
                     }
                 }
                 for my $host_name (keys %{$self->{'host_data'}}) {
                     my $last_known_state = $self->{'host_data'}->{$host_name}->{'last_known_state'};
                     my $last_state = STATE_UNSPECIFIED;
-                    $last_state = $last_known_state if defined $last_known_state and $last_known_state >= 0;
+                    $last_state = $last_known_state if(defined $last_known_state and $last_known_state >= 0);
                     $self->_set_host_event($host_name, $result, { 'time' => $data->{'time'}, 'state' => $last_state });
                 }
             } else {
@@ -714,14 +717,14 @@ sub _process_log_line {
                 for my $service_description (keys %{$self->{'service_data'}->{$host_name}}) {
                     my $last_known_state = $self->{'service_data'}->{$host_name}->{$service_description}->{'last_known_state'};
                     my $last_state = STATE_UNSPECIFIED;
-                    $last_state = $last_known_state if defined $last_known_state and $last_known_state >= 0;
+                    $last_state = $last_known_state if(defined $last_known_state and $last_known_state >= 0);
                     $self->_set_service_event($host_name, $service_description, $result, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'}, 'state' => $last_state });
                 }
             }
             for my $host_name (keys %{$self->{'host_data'}}) {
                 my $last_known_state = $self->{'host_data'}->{$host_name}->{'last_known_state'};
                 my $last_state = STATE_UNSPECIFIED;
-                $last_state = $last_known_state if defined $last_known_state and $last_known_state >= 0;
+                $last_state = $last_known_state if(defined $last_known_state and $last_known_state >= 0);
                 $self->_set_host_event($host_name, $result, { 'time' => $data->{'time'}, 'state' => $last_state });
             }
             $self->{'in_timeperiod'} = $data->{'to'};
@@ -960,8 +963,7 @@ sub _set_service_event {
     # set last state
     if(defined $data->{'state'}) {
         $self->_log('_set_service_event() set last state = '.$data->{'state'}) if $self->{'verbose'};
-        $service_hist->{'last_state'}  = $data->{'state'};
-
+        $service_hist->{'last_state'}       = $data->{'state'};
         $service_hist->{'last_known_state'} = $data->{'state'} if $data->{'state'} >= 0;
     }
 
@@ -1024,8 +1026,7 @@ sub _set_host_event {
     # set last state
     if(defined $data->{'state'}) {
         $self->_log('_set_host_event() set last state = '.$data->{'state'}) if $self->{'verbose'};
-        $host_hist->{'last_state'} = $data->{'state'};
-
+        $host_hist->{'last_state'}       = $data->{'state'};
         $host_hist->{'last_known_state'} = $data->{'state'} if $data->{'state'} >= 0;
     }
     $host_hist->{'last_state_time'} = $data->{'time'};
@@ -1115,8 +1116,8 @@ sub _insert_fake_event {
     for my $host (keys %{$result->{'services'}}) {
         for my $service (keys %{$result->{'services'}->{$host}}) {
             my $last_service_state = STATE_UNSPECIFIED;
-            if(defined $self->{'service_data'}->{$host}->{$service}->{'last_state'}) {
-                $last_service_state = $self->{'service_data'}->{$host}->{$service}->{'last_state'};
+            if(defined $self->{'service_data'}->{$host}->{$service}->{'last_known_state'}) {
+                $last_service_state = $self->{'service_data'}->{$host}->{$service}->{'last_known_state'};
             }
             my $fakedata = {
                 'service_description' => $service,
@@ -1132,8 +1133,8 @@ sub _insert_fake_event {
 
     for my $host (keys %{$result->{'hosts'}}) {
         my $last_host_state = STATE_UNSPECIFIED;
-        if(defined $self->{'host_data'}->{$host}->{'last_state'}) {
-            $last_host_state = $self->{'host_data'}->{$host}->{'last_state'};
+        if(defined $self->{'host_data'}->{$host}->{'last_known_state'}) {
+            $last_host_state = $self->{'host_data'}->{$host}->{'last_known_state'};
         }
         my $fakedata = {
             'time'                => $time,
