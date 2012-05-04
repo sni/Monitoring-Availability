@@ -39,6 +39,7 @@ t/34-timeperiods.t
 t/35-Monitoring-Availability-nologs.t
 t/92_clean_debug.t
 t/92_todo.t
+t/93-manifest.t
 t/97-Pod.t
 t/98-Pod-Coverage.t
 t/99-Perl-Critic.t
