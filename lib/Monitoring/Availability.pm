@@ -1119,6 +1119,9 @@ sub _insert_fake_event {
             if(defined $self->{'service_data'}->{$host}->{$service}->{'last_known_state'}) {
                 $last_service_state = $self->{'service_data'}->{$host}->{$service}->{'last_known_state'};
             }
+            elsif(defined $self->{'service_data'}->{$host}->{$service}->{'last_state'}) {
+                $last_service_state = $self->{'service_data'}->{$host}->{$service}->{'last_state'};
+            }
             my $fakedata = {
                 'service_description' => $service,
                 'time'                => $time,
@@ -1135,6 +1138,9 @@ sub _insert_fake_event {
         my $last_host_state = STATE_UNSPECIFIED;
         if(defined $self->{'host_data'}->{$host}->{'last_known_state'}) {
             $last_host_state = $self->{'host_data'}->{$host}->{'last_known_state'};
+        }
+        elsif(defined $self->{'host_data'}->{$host}->{'last_state'}) {
+            $last_host_state = $self->{'host_data'}->{$host}->{'last_state'};
         }
         my $fakedata = {
             'time'                => $time,
@@ -1320,7 +1326,7 @@ sub _calculate_log {
     ) {
         my $type;
         my $first_state = $self->{'report_options'}->{'initialassumedservicestate'};
-        if($first_state == STATE_CURRENT) { $first_state = $self->{'report_options'}->{'first_state'}; }
+        if($first_state == STATE_CURRENT)     { $first_state = $self->{'report_options'}->{'first_state'}; }
         if($first_state == STATE_OK)          { $type = 'OK'; }
         elsif($first_state == STATE_WARNING)  { $type = 'WARNING'; }
         elsif($first_state == STATE_UNKNOWN)  { $type = 'UNKNOWN'; }
