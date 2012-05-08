@@ -1,5 +1,8 @@
 Revision history for Perl extension Monitoring::Availability.
 
+0.34  Tue May  8 21:25:56 CEST 2012
+    - another fix in calculation with no logs
+
 0.32  Fri May  4 19:06:03 CEST 2012
     - fixed calculation with empty logs from livestatus
 
