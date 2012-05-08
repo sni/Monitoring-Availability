@@ -554,6 +554,12 @@ sub _compute_availability_on_the_fly {
         $self->_log('_compute_availability_on_the_fly() report end:   '.(scalar localtime $self->{'report_options'}->{'end'}));
     }
 
+    if(scalar @{$logs} == 0) {
+        $self->_compute_for_data(-1,
+                                 {time => $self->{'report_options'}->{'end'}},
+                                 $result);
+    }
+
     # process all log lines we got
     # make sure our logs are sorted by time
     my $last_time = -1;
@@ -1332,7 +1338,9 @@ sub _calculate_log {
         elsif($first_state == STATE_UNKNOWN)  { $type = 'UNKNOWN'; }
         elsif($first_state == STATE_CRITICAL) { $type = 'CRITICAL'; }
         my $fake_start = $self->{'report_options'}->{'start'};
-        if($fake_start >= $self->{'full_log_store'}->[0]->{'log'}->{'start'}) { $fake_start = $self->{'full_log_store'}->[0]->{'log'}->{'start'} - 1; }
+        if(defined $self->{'full_log_store'}->[0]) {
+            if($fake_start >= $self->{'full_log_store'}->[0]->{'log'}->{'start'}) { $fake_start = $self->{'full_log_store'}->[0]->{'log'}->{'start'} - 1; }
+        }
         my $fakelog = {
             'log' => {
                 'type'          => 'SERVICE '.$type.' (HARD)',
