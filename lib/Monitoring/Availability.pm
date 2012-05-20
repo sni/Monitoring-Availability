@@ -8,7 +8,7 @@ use Carp;
 use POSIX qw(strftime mktime);
 use Monitoring::Availability::Logs;
 
-our $VERSION = '0.34';
+our $VERSION = '0.36';
 
 
 =head1 NAME
@@ -638,6 +638,16 @@ sub _add_last_time_event {
     if($last_time < $self->{'report_options'}->{'start'}) {
         $self->_insert_fake_event($result, $self->{'report_options'}->{'start'});
     }
+
+    # breakpoints left?
+    my $breakpoint = $self->{'breakpoints'}->[0];
+    while(defined $breakpoint) {
+        $self->_log('_add_last_time_event(): inserted breakpoint: '.$breakpoint);
+        $self->_insert_fake_event($result, $breakpoint);
+        shift(@{$self->{'breakpoints'}});
+        $breakpoint = $self->{'breakpoints'}->[0];
+    }
+
 
     # no end event yet, insert fake end event
     if($last_time < $self->{'report_options'}->{'end'}) {

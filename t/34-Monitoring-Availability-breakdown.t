@@ -16,7 +16,7 @@ BEGIN {
         plan skip_all => 'windows is not supported';
     }
     else {
-        plan tests => 3;
+        plan tests => 4;
     }
 
     require 't/00_test_utils.pm';
@@ -98,6 +98,29 @@ my $result = $ma->calculate(
     'end'                           => 1335132000,
 );
 is_deeply($result, $expected, 'breakdown host') or diag("got:\n".Dumper($result)."\nbut expected:\n".Dumper($expected));
+
+#########################
+$result = $ma->calculate(
+    'log_string'                    => $logs,
+    'hosts'                         => ['mo'],
+    'start'                         => 1334959200,
+    'end'                           => 1335132100,
+);
+$expected->{'hosts'}->{'mo'}->{'time_up'} += 100;
+$expected->{'hosts'}->{'mo'}->{'breakdown'}->{'2012-04-23'} = {
+    'time_down' => 0,
+    'time_indeterminate_notrunning' => 0,
+    'scheduled_time_down' => 0,
+    'scheduled_time_up' => 0,
+    'time_unreachable' => 0,
+    'time_indeterminate_nodata' => 0,
+    'time_up' => 100,
+    'scheduled_time_unreachable' => 0,
+    'time_indeterminate_outside_timeperiod' => 0,
+    'scheduled_time_indeterminate' => 0
+};
+is_deeply($result, $expected, 'breakdown host') or diag("got:\n".Dumper($result)."\nbut expected:\n".Dumper($expected));
+
 
 __DATA__
 [1334959200] CURRENT HOST STATE: mo;UP;HARD;1;OK - 172.16.0.1: rta 25.610ms, lost 0%
