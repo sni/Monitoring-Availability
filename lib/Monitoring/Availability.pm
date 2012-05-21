@@ -195,6 +195,7 @@ sub new {
     }
 
     $self->_log('initialized '.$class) if $self->{'verbose'};
+    $self->_log($self)                 if $self->{'verbose'};
 
     return $self;
 }
@@ -310,7 +311,8 @@ sub calculate {
         'timeformat'                     => $self->{'timeformat'},
         'breakdown'                      => $self->{'breakdown'},
     };
-    $self->_log('calculate()') if $self->{'verbose'};
+    $self->_log('calculate()')             if $self->{'verbose'};
+    $self->_log($self->{'report_options'}) if $self->{'verbose'};
     my $result;
 
     for my $opt_key (keys %opts) {
@@ -358,12 +360,12 @@ sub calculate {
         $self->{'report_options'}->{'calc_all'} = TRUE;
     }
 
+    $self->_set_breakpoints();
+
     unless($self->{'report_options'}->{'calc_all'}) {
         $self->_set_empty_hosts($result);
         $self->_set_empty_services($result);
     }
-
-    $self->_set_breakpoints();
 
     # read in logs
     if(defined $self->{'report_options'}->{'log_string'} or $self->{'report_options'}->{'log_file'} or $self->{'report_options'}->{'log_dir'}) {
@@ -539,8 +541,8 @@ sub _compute_for_data {
     # if we passed a breakdown point, insert fake event
     if($self->{'report_options'}->{'breakdown'} != BREAK_NONE) {
         my $breakpoint = $self->{'breakpoints'}->[0];
-        while(defined $breakpoint and $last_time < $breakpoint and $data->{'time'} > $breakpoint) {
-            $self->_log('_compute_for_data(): inserted breakpoint: '.$breakpoint);
+        while(defined $breakpoint and $last_time < $breakpoint and $data->{'time'} >= $breakpoint) {
+            $self->_log('_compute_for_data(): inserted breakpoint: '.$breakpoint." (".scalar localtime($breakpoint).")") if $self->{'verbose'};
             $self->_insert_fake_event($result, $breakpoint);
             shift(@{$self->{'breakpoints'}});
             $breakpoint = $self->{'breakpoints'}->[0];
@@ -696,7 +698,7 @@ sub _add_last_time_event {
     # breakpoints left?
     my $breakpoint = $self->{'breakpoints'}->[0];
     while(defined $breakpoint) {
-        $self->_log('_add_last_time_event(): inserted breakpoint: '.$breakpoint);
+        $self->_log('_add_last_time_event(): inserted breakpoint: '.$breakpoint." (".scalar localtime($breakpoint).")") if $self->{'verbose'};
         $self->_insert_fake_event($result, $breakpoint);
         shift(@{$self->{'breakpoints'}});
         $breakpoint = $self->{'breakpoints'}->[0];
@@ -789,6 +791,7 @@ sub _process_log_line {
                             },
             );
         }
+        return;
     }
 
     # timeperiod transitions
@@ -828,6 +831,7 @@ sub _process_log_line {
                             },
             );
         }
+        return;
     }
 
     # skip hosts we dont need
@@ -1123,7 +1127,7 @@ sub _add_time {
     $self->_log('_add_time() '.$type.' + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
     $data->{$type} += $diff;
     if($in_downtime) {
-        $self->_log('_add_time() '.$type.' sched + '.$diff.' seconds') if $self->{'verbose'};
+        $self->_log('_add_time() '.$type.' scheduled + '.$diff.' seconds') if $self->{'verbose'};
         $data->{$scheduled_type} += $diff;
     }
 
@@ -1132,7 +1136,9 @@ sub _add_time {
         my($fmt, $timespan) = $self->_get_break_config();
         my $timestr = strftime($fmt, localtime($date-1));
         $data->{'breakdown'}->{$timestr}->{$type} += $diff;
+        $self->_log('_add_time() breakdown('.$timestr.') '.$type.' + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
         if($in_downtime) {
+            $self->_log('_add_time() breakdown('.$timestr.') '.$type.' scheduled + '.$diff.' seconds ('.$self->_duration($diff).')') if $self->{'verbose'};
             $data->{'breakdown'}->{$timestr}->{$scheduled_type} += $diff;
         }
     }
@@ -1146,6 +1152,7 @@ sub _log {
     return 1 unless $self->{'verbose'};
 
     if(ref $text ne '') {
+        $Data::Dumper::Sortkeys = \&_logging_filter;
         $text = Dumper($text);
     }
     $self->{'logger'}->debug($text);
@@ -1153,6 +1160,25 @@ sub _log {
     return 1;
 }
 
+########################################
+sub _logging_filter {
+    my ($hash) = @_;
+    my @keys = keys %{$hash};
+    # filter a few keys we don't want to log
+    @keys = grep {!/^(state_string_2_int
+                      |logger
+                      |peer_addr
+                      |peer_name
+                      |peer_key
+                      |log_string
+                      |log_livestatus
+                      |log_file
+                      |log_dir
+                      |log_iterator
+                      |current_host_groups
+                )$/mx} @keys;
+    return \@keys;
+}
 ##############################################
 # calculate a duration in the
 # format: 0d 0h 29m 43s
@@ -1452,7 +1478,7 @@ sub _calculate_log {
     if($self->{'verbose'}) {
         $self->_log("#################################");
         $self->_log("LOG STORE:");
-        $self->_log(Dumper(\@{$self->{'full_log_store'}}));
+        $self->_log(\@{$self->{'full_log_store'}});
         $self->_log("#################################");
     }
 
@@ -1521,11 +1547,9 @@ sub _new_service_data {
     if($breakdown != BREAK_NONE) {
         $data->{'breakdown'} = {};
         my($fmt, $timespan) = $self->_get_break_config();
-        my $cur = $self->{'report_options'}->{'start'};
-        while($cur < $self->{'report_options'}->{'end'}) {
+        for my $cur (@{$self->{'breakpoints'}}) {
             my $timestr = strftime($fmt, localtime($cur));
             $data->{'breakdown'}->{$timestr} = $self->_new_service_data(BREAK_NONE);
-            $cur = $cur + $timespan;
         }
     }
     return $data;
@@ -1551,11 +1575,9 @@ sub _new_host_data {
     if($breakdown != BREAK_NONE) {
         $data->{'breakdown'} = {};
         my($fmt, $timespan) = $self->_get_break_config();
-        my $cur = $self->{'report_options'}->{'start'};
-        while($cur < $self->{'report_options'}->{'end'}) {
+        for my $cur (@{$self->{'breakpoints'}}) {
             my $timestr = strftime($fmt, localtime($cur));
             $data->{'breakdown'}->{$timestr} = $self->_new_host_data(BREAK_NONE);
-            $cur = $cur + $timespan;
         }
     }
     return $data;
@@ -1590,7 +1612,7 @@ sub _set_breakpoints {
     my $cur = $self->{'report_options'}->{'start'};
     # round to next 0:00
     my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($cur);
-    $cur = mktime(0, 0, 0, $mday, $mon, $year, $wday, $yday, $isdst) + 86400;
+    $cur = mktime(0, 0, 0, $mday, $mon, $year, $wday, $yday, $isdst);
     while($cur < $self->{'report_options'}->{'end'}) {
         push @{$self->{'breakpoints'}}, $cur;
         $cur = $cur + 86400;
