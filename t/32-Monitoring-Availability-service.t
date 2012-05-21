@@ -57,22 +57,22 @@ my $expected = {
 };
 
 my $expected_condensed_log = [
-    { 'start' => '2010-01-21 23:12:10', end => '2010-01-21 23:13:05', 'duration' => '0d 0h 0m 55s',  'type' => 'SERVICE DOWNTIME START', plugin_output => 'Start of scheduled downtime', 'class' => 'INDETERMINATE' },
-    { 'start' => '2010-01-21 23:13:05', end => '2010-01-21 23:13:37', 'duration' => '0d 0h 0m 32s',  'type' => 'SERVICE DOWNTIME END', plugin_output => 'End of scheduled downtime', 'class' => 'INDETERMINATE' },
-    { 'start' => '2010-01-21 23:14:00', end => '2010-01-21 23:14:20', 'duration' => '0d 0h 0m 20s',  'type' => 'SERVICE UNKNOWN (HARD)', plugin_output => 'unknown', 'class' => 'UNKNOWN' },
-    { 'start' => '2010-01-21 23:14:20', end => '2010-01-21 23:14:34', 'duration' => '0d 0h 0m 14s',  'type' => 'SERVICE CRITICAL (HARD)', plugin_output => 'critical', 'class' => 'CRITICAL' },
-    { 'start' => '2010-01-21 23:14:34', end => '2010-01-21 23:25:07', 'duration' => '0d 0h 10m 33s+','type' => 'HOST DOWNTIME START', plugin_output => 'Start of scheduled downtime', 'class' => 'INDETERMINATE' },
+    { 'start' => '2010-01-21 23:12:10', end => '2010-01-21 23:13:05', 'duration' => '0d 0h 0m 55s',  'type' => 'SERVICE DOWNTIME START', plugin_output => 'Start of scheduled downtime', 'class' => 'INDETERMINATE', 'in_downtime' => 1 },
+    { 'start' => '2010-01-21 23:13:05', end => '2010-01-21 23:13:37', 'duration' => '0d 0h 0m 32s',  'type' => 'SERVICE DOWNTIME END', plugin_output => 'End of scheduled downtime', 'class' => 'INDETERMINATE', 'in_downtime' => 0 },
+    { 'start' => '2010-01-21 23:14:00', end => '2010-01-21 23:14:20', 'duration' => '0d 0h 0m 20s',  'type' => 'SERVICE UNKNOWN (HARD)', plugin_output => 'unknown', 'class' => 'UNKNOWN', 'in_downtime' => 0 },
+    { 'start' => '2010-01-21 23:14:20', end => '2010-01-21 23:14:34', 'duration' => '0d 0h 0m 14s',  'type' => 'SERVICE CRITICAL (HARD)', plugin_output => 'critical', 'class' => 'CRITICAL', 'in_downtime' => 0 },
+    { 'start' => '2010-01-21 23:14:34', end => '2010-01-21 23:25:07', 'duration' => '0d 0h 10m 33s+','type' => 'HOST DOWNTIME START', plugin_output => 'Start of scheduled downtime', 'class' => 'INDETERMINATE', 'in_downtime' => 1 },
 ];
 
 my $expected_full_log = [
     { 'start' => '2010-01-21 23:05:15', end => '2010-01-21 23:12:10', 'duration' => '0d 0h 6m 55s',  'type' => 'PROGRAM (RE)START', plugin_output => 'Program start', 'class' => 'INDETERMINATE' },
-    { 'start' => '2010-01-21 23:12:10', end => '2010-01-21 23:13:05', 'duration' => '0d 0h 0m 55s',  'type' => 'SERVICE DOWNTIME START', plugin_output => 'Start of scheduled downtime', 'class' => 'INDETERMINATE' },
-    { 'start' => '2010-01-21 23:13:05', end => '2010-01-21 23:13:37', 'duration' => '0d 0h 0m 32s',  'type' => 'SERVICE DOWNTIME END', plugin_output => 'End of scheduled downtime', 'class' => 'INDETERMINATE' },
+    { 'start' => '2010-01-21 23:12:10', end => '2010-01-21 23:13:05', 'duration' => '0d 0h 0m 55s',  'type' => 'SERVICE DOWNTIME START', plugin_output => 'Start of scheduled downtime', 'class' => 'INDETERMINATE', 'in_downtime' => 1 },
+    { 'start' => '2010-01-21 23:13:05', end => '2010-01-21 23:13:37', 'duration' => '0d 0h 0m 32s',  'type' => 'SERVICE DOWNTIME END', plugin_output => 'End of scheduled downtime', 'class' => 'INDETERMINATE', 'in_downtime' => 0},
     { 'start' => '2010-01-21 23:13:37', end => '2010-01-21 23:13:38', 'duration' => '0d 0h 0m 1s',   'type' => 'PROGRAM (RE)START', plugin_output => 'Program restart', 'class' => 'INDETERMINATE' },
     { 'start' => '2010-01-21 23:13:38', end => '2010-01-21 23:14:00', 'duration' => '0d 0h 0m 22s',  'type' => 'PROGRAM (RE)START', plugin_output => 'Program start', 'class' => 'INDETERMINATE' },
-    { 'start' => '2010-01-21 23:14:00', end => '2010-01-21 23:14:20', 'duration' => '0d 0h 0m 20s',  'type' => 'SERVICE UNKNOWN (HARD)', plugin_output => 'unknown', 'class' => 'UNKNOWN' },
-    { 'start' => '2010-01-21 23:14:20', end => '2010-01-21 23:14:34', 'duration' => '0d 0h 0m 14s',  'type' => 'SERVICE CRITICAL (HARD)', plugin_output => 'critical', 'class' => 'CRITICAL' },
-    { 'start' => '2010-01-21 23:14:34', end => '2010-01-21 23:25:07', 'duration' => '0d 0h 10m 33s+','type' => 'HOST DOWNTIME START', plugin_output => 'Start of scheduled downtime', 'class' => 'INDETERMINATE' },
+    { 'start' => '2010-01-21 23:14:00', end => '2010-01-21 23:14:20', 'duration' => '0d 0h 0m 20s',  'type' => 'SERVICE UNKNOWN (HARD)', plugin_output => 'unknown', 'class' => 'UNKNOWN', 'in_downtime' => 0 },
+    { 'start' => '2010-01-21 23:14:20', end => '2010-01-21 23:14:34', 'duration' => '0d 0h 0m 14s',  'type' => 'SERVICE CRITICAL (HARD)', plugin_output => 'critical', 'class' => 'CRITICAL', 'in_downtime' => 0 },
+    { 'start' => '2010-01-21 23:14:34', end => '2010-01-21 23:25:07', 'duration' => '0d 0h 10m 33s+','type' => 'HOST DOWNTIME START', plugin_output => 'Start of scheduled downtime', 'class' => 'INDETERMINATE', 'in_downtime' => 1 },
 ];
 
 #########################
