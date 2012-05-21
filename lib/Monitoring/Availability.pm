@@ -178,6 +178,11 @@ sub new {
         '3'           => STATE_UNKNOWN,
     };
 
+    # allow setting debug mode from env
+    if(defined $ENV{'MONITORING_AVAILABILITY_DEBUG'}) {
+        $self->{'verbose'} = 1;
+    }
+
     # init log4perl, may require additional modules
     if($self->{'verbose'} and !defined $self->{'logger'}) {
         require Log::Log4perl;
@@ -234,6 +239,10 @@ Array with logs from a livestatus query
  a sample query could be:
  selectall_arrayref(GET logs...\nColumns: time type options, {Slice => 1})
 
+=item log_iterator
+
+ Iterator object for logentry objects. For example a L<MongoDB::Cursor> object.
+
 =item hosts
 
 array with hostnames for which the report should be generated
@@ -288,6 +297,7 @@ sub calculate {
         'log_livestatus'                 => undef,   # logs from a livestatus query
         'log_file'                       => undef,   # logs from a file
         'log_dir'                        => undef,   # logs from a dir
+        'log_iterator'                   => undef,   # logs from a iterator object
         'rpttimeperiod'                  => $self->{'rpttimeperiod'} || '',
         'assumeinitialstates'            => $self->{'assumeinitialstates'},
         'assumestateretention'           => $self->{'assumestateretention'},
@@ -367,6 +377,9 @@ sub calculate {
     }
     elsif(defined $self->{'report_options'}->{'log_livestatus'}) {
         $self->_compute_availability_on_the_fly($result, $self->{'report_options'}->{'log_livestatus'});
+    }
+    elsif(defined $self->{'report_options'}->{'log_iterator'}) {
+        $self->_compute_availability_from_iterator($result, $self->{'report_options'}->{'log_iterator'});
     }
 
     return($result);
@@ -552,6 +565,47 @@ sub _compute_for_data {
 
     return 1;
 }
+
+
+########################################
+sub _compute_availability_from_iterator {
+    my $self    = shift;
+    my $result  = shift;
+    my $logs    = shift;
+
+    if($self->{'verbose'}) {
+        $self->_log('_compute_availability_from_iterator()');
+        $self->_log('_compute_availability_from_iterator() report start: '.(scalar localtime $self->{'report_options'}->{'start'}));
+        $self->_log('_compute_availability_from_iterator() report end:   '.(scalar localtime $self->{'report_options'}->{'end'}));
+    }
+
+    my $last_time = -1;
+    # no logs at all?
+    unless($logs->has_next) {
+        $self->_compute_for_data(-1,
+                                 {time => $self->{'report_options'}->{'end'}, fake => 1},
+                                 $result);
+        $last_time = $self->{'report_options'}->{'end'};
+    }
+
+    # process all log lines we got
+    # logs should be sorted already
+    while(my $data = $logs->next) {
+        $self->_compute_for_data($last_time,
+                                 Monitoring::Availability::Logs->_parse_livestatus_entry($data),
+                                 $result);
+
+        # set timestamp of last log line
+        $last_time = $data->{'time'};
+    }
+
+    # processing logfiles finished
+
+    $self->_add_last_time_event($last_time, $result);
+
+    return 1;
+}
+
 
 ########################################
 sub _compute_availability_on_the_fly {
@@ -1551,6 +1605,13 @@ sub _set_breakpoints {
 =head1 BUGS
 
 Please report any bugs or feature requests to L<http://github.com/sni/Monitoring-Availability/issues>.
+
+=head1 DEBUGING
+
+You may enable the debug mode by setting MONITORING_AVAILABILITY_DEBUG environment variable.
+This will create a logfile: /tmp/Monitoring-Availability-Debug.log which gets overwritten with
+every calculation.
+You will need the Log4Perl module to create this logfile.
 
 =head1 SEE ALSO
 
