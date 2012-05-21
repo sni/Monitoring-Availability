@@ -873,6 +873,7 @@ sub _process_log_line {
                                 'type'          => 'SERVICE '.$state_text.$hard,
                                 'plugin_output' => $data->{'plugin_output'},
                                 'class'         => $state_text,
+                                'in_downtime'   => $service_hist->{'in_downtime'},
                             },
                 ) unless $self->{'report_options'}->{'build_log'} == HOST_ONLY;
             }
@@ -903,6 +904,7 @@ sub _process_log_line {
                                 'type'          => 'SERVICE DOWNTIME '.$start,
                                 'plugin_output' => $plugin_output,
                                 'class'         => 'INDETERMINATE',
+                                'in_downtime'   => $service_hist->{'in_downtime'},
                             },
             ) unless $self->{'report_options'}->{'build_log'} == HOST_ONLY;
         }
@@ -932,6 +934,7 @@ sub _process_log_line {
                                 'type'          => 'HOST '.$state_text.$hard,
                                 'plugin_output' => $data->{'plugin_output'},
                                 'class'         => $state_text,
+                                'in_downtime'   => $host_hist->{'in_downtime'},
                             },
                 );
             }
@@ -973,6 +976,7 @@ sub _process_log_line {
                                 'type'          => 'HOST DOWNTIME '.$start,
                                 'plugin_output' => $plugin_output,
                                 'class'         => 'INDETERMINATE',
+                                'in_downtime'   => $host_hist->{'in_downtime'},
                             },
             );
         }
