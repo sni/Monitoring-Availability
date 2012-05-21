@@ -178,6 +178,17 @@ sub new {
         '3'           => STATE_UNKNOWN,
     };
 
+    # init log4perl, may require additional modules
+    if($self->{'verbose'} and !defined $self->{'logger'}) {
+        require Log::Log4perl;
+        Log::Log4perl->import(qw(:easy));
+        Log::Log4perl->easy_init({
+            level   => 'DEBUG',
+            file    => ">/tmp/Monitoring-Availability-Debug.log"
+        });
+        $self->{'logger'} = get_logger();
+    }
+
     $self->_log('initialized '.$class) if $self->{'verbose'};
 
     return $self;
@@ -1067,15 +1078,13 @@ sub _add_time {
 
 ########################################
 sub _log {
-    my $self = shift;
-    my $text = shift;
+    my($self, $text) = @_;
+    return 1 unless $self->{'verbose'};
 
-    if($self->{'verbose'} and defined $self->{'logger'}) {
-        if(ref $text ne '') {
-            $text = Dumper($text);
-        }
-        $self->{'logger'}->debug($text);
+    if(ref $text ne '') {
+        $text = Dumper($text);
     }
+    $self->{'logger'}->debug($text);
 
     return 1;
 }
