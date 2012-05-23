@@ -33,8 +33,7 @@ while(my $line = <DATA>) {
 }
 
 my $options = {
-    'verbose'                       => 1,
-    'logger'                        => $logger,
+    'verbose'                       => 0,
     'backtrack'                     => 4,
     'assumestateretention'          => 'yes',
     'assumeinitialstates'           => 'yes',

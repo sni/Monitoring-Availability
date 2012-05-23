@@ -84,8 +84,7 @@ my $expected_full_log = [
 #########################
 # avail.cgi?t1=1263718203&t2=1264323003&show_log_entries=&full_log_entries=&host=n0_test_host_001&assumeinitialstates=yes&assumestateretention=yes&assumestatesduringnotrunning=yes&includesoftstates=no&initialassumedhoststate=0&initialassumedservicestate=0&timeperiod=[+Current+time+range+]&backtrack=4
 my $ma = Monitoring::Availability->new(
-    'verbose'                       => 1,
-    'logger'                        => $logger,
+    'verbose'                       => 0,
     'backtrack'                     => 4,
     'assumestateretention'          => 'yes',
     'assumeinitialstates'           => 'yes',

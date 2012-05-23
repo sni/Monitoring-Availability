@@ -48,8 +48,7 @@ my $expected = {
 
 #########################
 my $ma = Monitoring::Availability->new(
-    'verbose'                       => 1,
-    'logger'                        => $logger,
+    'verbose'                       => 0,
     'assumeinitialstates'           => 'yes',
     'initialassumedhoststate'       => 'up',
     'initialassumedservicestate'    => 'ok',

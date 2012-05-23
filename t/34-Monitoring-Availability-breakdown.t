@@ -80,8 +80,7 @@ my $expected = {
 
 #########################
 my $ma = Monitoring::Availability->new(
-    'verbose'                       => 1,
-    'logger'                        => $logger,
+    'verbose'                       => 0,
     'backtrack'                     => 4,
     'assumestateretention'          => 'yes',
     'assumeinitialstates'           => 'yes',
