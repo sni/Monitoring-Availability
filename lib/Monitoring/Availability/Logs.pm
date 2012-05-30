@@ -206,6 +206,7 @@ sub _parse_line {
 ########################################
 # search for a token and return first occurance, trim that part from string
 sub _strtok {
+    return '' unless defined $_[1];
     my $index = index($_[1], $_[2]);
     if($index != -1) {
         my $value = substr($_[1], 0, $index, '');
