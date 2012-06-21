@@ -1,6 +1,6 @@
 Revision history for Perl extension Monitoring::Availability.
 
-0.38  not yet released
+0.38  Thu Jun 21 10:25:03 CEST 2012
     - don't break on broken logfiles
 
 0.36  Mon May 21 16:53:29 CEST 2012
