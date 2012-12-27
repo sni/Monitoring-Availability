@@ -334,7 +334,8 @@ sub _statestr_to_state {
     return 3 if $string eq 'UNKNOWN';
     return 0 if $string eq 'RECOVERY';
     return 0 if $string eq 'PENDING';
-    confess("unknown state: $string");
+    carp("unknown state: $string");
+    return;
 }
 
 

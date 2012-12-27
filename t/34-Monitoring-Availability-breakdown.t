@@ -59,7 +59,8 @@ my $expected = {
                                                   'time_up' => 85818,
                                                   'scheduled_time_unreachable' => 0,
                                                   'time_indeterminate_outside_timeperiod' => 0,
-                                                  'scheduled_time_indeterminate' => 0
+                                                  'scheduled_time_indeterminate' => 0,
+                                                  'timestamp' => 1335045600
                                                 },
                                 '2012-04-21' => {
                                                   'time_down' => 0,
@@ -71,7 +72,8 @@ my $expected = {
                                                   'time_up' => 86400,
                                                   'scheduled_time_unreachable' => 0,
                                                   'time_indeterminate_outside_timeperiod' => 0,
-                                                  'scheduled_time_indeterminate' => 0
+                                                  'scheduled_time_indeterminate' => 0,
+                                                  'timestamp' => 1334959200
                                                 }
                               },
         }
@@ -116,7 +118,8 @@ $expected->{'hosts'}->{'mo'}->{'breakdown'}->{'2012-04-23'} = {
     'time_up' => 100,
     'scheduled_time_unreachable' => 0,
     'time_indeterminate_outside_timeperiod' => 0,
-    'scheduled_time_indeterminate' => 0
+    'scheduled_time_indeterminate' => 0,
+    'timestamp' => 1335132000
 };
 is_deeply($result, $expected, 'breakdown host') or diag("got:\n".Dumper($result)."\nbut expected:\n".Dumper($expected));
 
