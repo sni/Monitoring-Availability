@@ -8,7 +8,7 @@ use Carp;
 use POSIX qw(strftime mktime);
 use Monitoring::Availability::Logs;
 
-our $VERSION = '0.38';
+our $VERSION = '0.40';
 
 
 =head1 NAME
@@ -631,13 +631,14 @@ sub _compute_availability_on_the_fly {
     # process all log lines we got
     # make sure our logs are sorted by time
     for my $data ( sort { $a->{'time'} <=> $b->{'time'} } @{$logs} ) {
+        eval {
+            $self->_compute_for_data($last_time,
+                                     Monitoring::Availability::Logs->_parse_livestatus_entry($data),
+                                     $result);
 
-        $self->_compute_for_data($last_time,
-                                 Monitoring::Availability::Logs->_parse_livestatus_entry($data),
-                                 $result);
-
-        # set timestamp of last log line
-        $last_time = $data->{'time'};
+            # set timestamp of last log line
+            $last_time = $data->{'time'};
+        }
     }
 
     # processing logfiles finished

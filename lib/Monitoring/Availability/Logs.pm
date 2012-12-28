@@ -234,6 +234,7 @@ sub _set_from_options {
     ) {
         $data->{'host_name'}     = $self->_strtok($string, ';');
         $data->{'state'}         = $self->_statestr_to_state($self->_strtok($string, ';'));
+        return unless defined $data->{'state'};
         $data->{'hard'}          = $self->_softstr_to_hard($self->_strtok($string, ';'));
                                    $self->_strtok($string, ';');
         $data->{'plugin_output'} = $self->_strtok($string, ';');
@@ -247,6 +248,7 @@ sub _set_from_options {
         $data->{'host_name'}           = $self->_strtok($string, ';');
         $data->{'service_description'} = $self->_strtok($string, ';');
         $data->{'state'}               = $self->_statestr_to_state($self->_strtok($string, ';'));
+        return unless defined $data->{'state'};
         $data->{'hard'}                = $self->_softstr_to_hard($self->_strtok($string, ';'));
                                          $self->_strtok($string, ';');
         $data->{'plugin_output'}       = $self->_strtok($string, ';');
@@ -334,7 +336,7 @@ sub _statestr_to_state {
     return 3 if $string eq 'UNKNOWN';
     return 0 if $string eq 'RECOVERY';
     return 0 if $string eq 'PENDING';
-    carp("unknown state: $string");
+    die("unknown state: $string");
     return;
 }
 
