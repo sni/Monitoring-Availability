@@ -533,7 +533,7 @@ sub _compute_for_data {
     my $result      = shift;
 
     # if we reach the start date of our report, insert a fake entry
-    if($last_time < $self->{'report_options'}->{'start'} and $data->{'time'} > $self->{'report_options'}->{'start'}) {
+    if($last_time < $self->{'report_options'}->{'start'} and $data->{'time'} >= $self->{'report_options'}->{'start'}) {
         $self->_insert_fake_event($result, $self->{'report_options'}->{'start'});
     }
 
