@@ -1,5 +1,8 @@
 Revision history for Perl extension Monitoring::Availability.
 
+0.42  Thu Feb 21 16:38:30 CET 2013
+    - fixed breakdown by weeks
+
 0.40  Sat Dec 29 20:51:55 CET 2012
     - changed confess to warning on bogus logentries
     - fixed breakdown by weeks
