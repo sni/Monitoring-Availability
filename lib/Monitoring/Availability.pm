@@ -1598,7 +1598,7 @@ sub _get_break_timestr {
         return strftime('%Y-%m-%d', @localtime);
     }
     elsif($self->{'report_options'}->{'breakdown'} == BREAK_WEEKS) {
-        return strftime('%G-%V', @localtime);
+        return strftime('%G-WK%V', @localtime);
     }
     elsif($self->{'report_options'}->{'breakdown'} == BREAK_MONTHS) {
         return strftime('%Y-%m', @localtime);
