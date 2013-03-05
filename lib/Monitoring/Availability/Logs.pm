@@ -164,7 +164,7 @@ sub _parse_livestatus_entry {
     my $self   = shift;
     my $entry  = shift;
 
-    my $string = $entry->{'options'} || '';
+    my $string = $entry->{'message'} || $entry->{'options'} || '';
     if($string eq '') {
         # extract starts/stops
         $self->_set_from_type($entry, $string);
@@ -172,7 +172,11 @@ sub _parse_livestatus_entry {
     }
 
     # extract more information from our options
-    $self->_set_from_options($entry, $string);
+    if($entry->{'message'}) {
+        return $self->_parse_line($string);
+    } else {
+        $self->_set_from_options($entry, $string);
+    }
 
     return $entry;
 }

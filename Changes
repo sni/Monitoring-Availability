@@ -1,5 +1,8 @@
 Revision history for Perl extension Monitoring::Availability.
 
+0.44  Tue Mar  5 13:21:22 CET 2013
+    - added support for livestatus logs from mysql logfilecache
+
 0.42  Thu Feb 21 16:38:30 CET 2013
     - fixed breakdown by weeks
     - fixed calculation when report start is at the same time as log entry
