@@ -368,7 +368,11 @@ sub calculate {
     }
 
     # read in logs
-    if(defined $self->{'report_options'}->{'log_string'} or $self->{'report_options'}->{'log_file'} or $self->{'report_options'}->{'log_dir'}) {
+    if($self->{'report_options'}->{'log_file'} and !$self->{'report_options'}->{'log_string'} and !$self->{'report_options'}->{'log_dir'}) {
+        # single file can be read line by line to save memory
+        $self->_compute_availability_line_by_line($result, $self->{'report_options'}->{'log_file'});
+    }
+    elsif(defined $self->{'report_options'}->{'log_string'} or $self->{'report_options'}->{'log_file'} or $self->{'report_options'}->{'log_dir'}) {
         my $mal = Monitoring::Availability::Logs->new(
             'log_string'        => $self->{'report_options'}->{'log_string'},
             'log_file'          => $self->{'report_options'}->{'log_file'},
@@ -563,6 +567,38 @@ sub _compute_for_data {
 
     # now process the real line
     $self->_process_log_line($result, $data) unless defined $data->{'fake'};
+
+    return 1;
+}
+
+########################################
+sub _compute_availability_line_by_line {
+    my($self,$result,$file) = @_;
+
+    if($self->{'verbose'}) {
+        $self->_log('_compute_availability_line_by_line()');
+        $self->_log('_compute_availability_line_by_line() report start: '.(scalar localtime $self->{'report_options'}->{'start'}));
+        $self->_log('_compute_availability_line_by_line() report end:   '.(scalar localtime $self->{'report_options'}->{'end'}));
+    }
+
+    open(my $fh, '<', $file) or die("cannot read ".$file.": ".$!);
+
+    my $last_time = -1;
+
+    # process all log lines we got
+    # logs should be sorted already
+    while(my $line = <$fh>) {
+        chomp($line);
+        my $data = Monitoring::Availability::Logs->_parse_line($line);
+        next unless $data;
+        $self->_compute_for_data($last_time, $data, $result);
+        # set timestamp of last log line
+        $last_time = $data->{'time'};
+    }
+
+    $self->_add_last_time_event($last_time, $result);
+
+    close($fh);
 
     return 1;
 }

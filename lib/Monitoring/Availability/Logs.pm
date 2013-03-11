@@ -183,8 +183,7 @@ sub _parse_livestatus_entry {
 
 ########################################
 sub _parse_line {
-    my $self   = shift;
-    my $string = shift;
+    my($self,$string) = @_;
     my $return = {
         'time' => '',
         'type' => '',
@@ -227,9 +226,7 @@ sub _strtok {
 
 ########################################
 sub _set_from_options {
-    my $self   = shift;
-    my $data   = shift;
-    my $string = shift;
+    my($self, $data, $string) = @_;
 
     # Host States
     if(   $data->{'type'} eq 'HOST ALERT'
@@ -273,7 +270,7 @@ sub _set_from_options {
 
     # Timeperiod Transitions
     # livestatus does not parse this correct, so we have to use regex
-    elsif($data->{'type'} =~ m/^TIMEPERIOD\ TRANSITION/mx) {
+    elsif($data->{'type'} =~ m/^TIMEPERIOD\ TRANSITION/mxo) {
         $data->{'type'}       = 'TIMEPERIOD TRANSITION';
         $data->{'timeperiod'} = $self->_strtok($string, ';');
         $data->{'from'}       = $self->_strtok($string, ';');
@@ -285,23 +282,21 @@ sub _set_from_options {
 
 ########################################
 sub _set_from_type {
-    my $self   = shift;
-    my $data   = shift;
-    my $string = shift;
+    my($self,$data,$string) = @_;
 
     # program starts
-    if($data->{'type'} =~ m/\ starting\.\.\./mx) {
+    if($data->{'type'} =~ m/\ starting\.\.\./mxo) {
         $data->{'proc_start'} = START_NORMAL;
     }
-    elsif($data->{'type'} =~ m/\ restarting\.\.\./mx) {
+    elsif($data->{'type'} =~ m/\ restarting\.\.\./mxo) {
         $data->{'proc_start'} = START_RESTART;
     }
 
     # program stops
-    elsif($data->{'type'} =~ m/shutting\ down\.\.\./mx) {
+    elsif($data->{'type'} =~ m/shutting\ down\.\.\./mxo) {
         $data->{'proc_start'} = STOP_NORMAL;
     }
-    elsif($data->{'type'} =~ m/Bailing\ out/mx) {
+    elsif($data->{'type'} =~ m/Bailing\ out/mxo) {
         $data->{'proc_start'} = STOP_ERROR;
     }
 
@@ -310,8 +305,7 @@ sub _set_from_type {
 
 ########################################
 sub _startstr_to_start {
-    my $self   = shift;
-    my $string = shift;
+    my($self, $string) = @_;
 
     return 1 if $string eq 'STARTED';
     return 0;
