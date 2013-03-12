@@ -7,3 +7,7 @@ MANIFEST.bak
 MANIFEST.SKIP
 TODO
 \.swp
+after.txt
+before.txt
+test.pl
+nytprof
