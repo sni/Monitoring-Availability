@@ -116,6 +116,35 @@ sub get_logs {
     return($self->{'logs'});
 }
 
+########################################
+
+=head2 parse_line
+
+ parse_line($line)
+
+return parsed logfile line
+
+=cut
+
+sub parse_line {
+    return if substr($_[0], 0, 1, '') ne '[';
+    my $return = {
+        'time' => substr($_[0], 0, 10, '')
+    };
+    substr($_[0], 0, 2, '');
+
+    ($return->{'type'},$_[0]) = split(/:\ /mxo, $_[0], 2);
+    if(!$_[0]) {
+        # extract starts/stops
+        &_set_from_type($return);
+        return $return;
+    }
+
+    # extract more information from our options
+    &_set_from_options($return->{'type'}, $return, $_[0]);
+
+    return $return;
+}
 
 ########################################
 # INTERNAL SUBS
@@ -125,7 +154,7 @@ sub _store_logs_from_string {
     my $string = shift;
     return unless defined $string;
     for my $line (split/\n/mxo, $string) {
-        my $data = _parse_line($line);
+        my $data = &parse_line($line);
         push @{$self->{'logs'}}, $data if defined $data;
     }
     return 1;
@@ -140,7 +169,7 @@ sub _store_logs_from_file {
     open(my $FH, '<', $file) or croak('cannot read file '.$file.': '.$!);
     while(my $line = <$FH>) {
         chomp($line);
-        my $data = _parse_line($line);
+        my $data = &parse_line($line);
         push @{$self->{'logs'}}, $data if defined $data;
     }
     close($FH);
@@ -190,33 +219,12 @@ sub _parse_livestatus_entry {
 
     # extract more information from our options
     if($entry->{'message'}) {
-        return &_parse_line($string);
+        return &parse_line($string);
     } else {
         &_set_from_options($entry->{'type'}, $entry, $string);
     }
 
     return $entry;
-}
-
-########################################
-sub _parse_line {
-    return if substr($_[0], 0, 1, '') ne '[';
-    my $return = {
-        'time' => substr($_[0], 0, 10, '')
-    };
-    substr($_[0], 0, 2, '');
-
-    ($return->{'type'},$_[0]) = split(/:\ /mxo, $_[0], 2);
-    if(!$_[0]) {
-        # extract starts/stops
-        &_set_from_type($return);
-        return $return;
-    }
-
-    # extract more information from our options
-    &_set_from_options($return->{'type'}, $return, $_[0]);
-
-    return $return;
 }
 
 ########################################

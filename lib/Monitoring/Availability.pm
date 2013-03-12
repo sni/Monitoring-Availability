@@ -734,9 +734,7 @@ sub _compute_availability_from_log_store {
 
 ########################################
 sub _add_last_time_event {
-    my $self      = shift;
-    my $last_time = shift;
-    my $result    = shift;
+    my($self, $last_time, $result) = @_;
 
     # no start event yet, insert a fake entry
     if($last_time < $self->{'report_options'}->{'start'}) {
@@ -1224,8 +1222,7 @@ sub _logging_filter {
 # calculate a duration in the
 # format: 0d 0h 29m 43s
 sub _duration {
-    my $self     = shift;
-    my $duration = shift;
+    my($self, $duration) = @_;
 
     croak("undef duration in duration(): ".$duration) unless defined $duration;
     $duration = $duration * -1 if $duration < 0;
@@ -1255,9 +1252,7 @@ sub _duration {
 
 ########################################
 sub _insert_fake_event {
-    my $self    = shift;
-    my $result  = shift;
-    my $time    = shift;
+    my($self, $result, $time) = @_;
 
     $self->_log('_insert_fake_event()') if $verbose;
     for my $host (keys %{$result->{'services'}}) {
@@ -1446,7 +1441,7 @@ sub _add_log_entry {
 
 ########################################
 sub _calculate_log {
-    my $self = shift;
+    my($self) = @_;
 
     $self->_log('_calculate_log()') if $verbose;
 
@@ -1553,8 +1548,7 @@ sub _calculate_log {
 
 ########################################
 sub _state_to_int {
-    my $self   = shift;
-    my $string = shift;
+    my($self, $string) = @_;
 
     return unless defined $string;
 
