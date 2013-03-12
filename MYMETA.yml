@@ -3,7 +3,7 @@ abstract: 'Calculate Availability Data from'
 author:
   - 'Sven Nierlein, <nierlein@cpan.org>'
 build_requires:
-  ExtUtils::MakeMaker: 0
+  ExtUtils::MakeMaker: 6.59
 configure_requires:
   ExtUtils::MakeMaker: 0
 dynamic_config: 0
@@ -20,4 +20,4 @@ no_index:
 requires:
   Test::More: 0.87
   perl: 5.008
-version: 0.44
+version: 0.46

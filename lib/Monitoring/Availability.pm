@@ -8,7 +8,7 @@ use Carp;
 use POSIX qw(strftime mktime);
 use Monitoring::Availability::Logs;
 
-our $VERSION = '0.44';
+our $VERSION = '0.46';
 
 
 =head1 NAME
@@ -602,7 +602,7 @@ sub _compute_availability_line_by_line {
     # logs should be sorted already
     while(<$fh>) {
         chop;
-        my $data = &Monitoring::Availability::Logs::_parse_line($_);
+        my $data = &Monitoring::Availability::Logs::parse_line($_);
         next unless $data;
         &_compute_for_data($self,$last_time, $data, $result);
         # set timestamp of last log line
