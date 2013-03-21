@@ -284,6 +284,23 @@ sub _set_from_options {
         $data->{'to'}         = $tmp[2];
     }
 
+    # Host States
+    elsif($type eq 'HOST NOTIFICATION') {
+        my @tmp = split(/;/mxo, $string,5); # regex is faster than strtok here
+        $data->{'contact_name'}  = $tmp[0];
+        $data->{'host_name'}     = $tmp[1];
+        $data->{'plugin_output'} = $tmp[4];
+    }
+
+    # Service States
+    elsif($type eq 'SERVICE NOTIFICATION') {
+        my @tmp = split(/;/mxo, $string,6); # regex is faster than strtok here
+        $data->{'contact_name'}         = $tmp[0];
+        $data->{'host_name'}            = $tmp[1];
+        $data->{'service_description'}  = $tmp[2];
+        $data->{'plugin_output'}        = $tmp[5];
+    }
+
     return 1;
 }
 
