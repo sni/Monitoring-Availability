@@ -21,7 +21,7 @@ my $livestatus_logs= [
     { 'time' => '1261686484', 'type' => 'SERVICE ALERT', 'options' => 'i0test_host_132;i0test_random_18;CRITICAL;HARD;1;mo CRITICAL: random servicecheck critical', 'service_description' => 'i0test_random_18', 'plugin_output' => 'mo CRITICAL: random servicecheck critical', 'state' => '2', 'host_name' => 'i0test_host_132', 'class' => '1', },
     { 'time' => '1262850822', 'type' => 'SERVICE DOWNTIME ALERT', 'options' => 'localhost;test;STARTED; Service has entered a period of scheduled downtime', 'service_description' => 'test', 'host_name' => 'localhost', 'class' => '1', 'state' => '0' },
     { 'time' => '1261686379', 'type' => 'SERVICE FLAPPING ALERT', 'options' => 'i0test_host_135;i0test_flap_01;STARTED; Service appears to have started flapping (24.2% change >= 20.0% threshold)', 'service_description' => 'i0test_flap_01', 'host_name' => 'i0test_host_135', 'class' => '1', 'state' => '0' },
-    { 'time' => '1261685289', 'type' => 'SERVICE NOTIFICATION', 'options' => 'test_contact;i0test_host_180;i0test_random_18;OK;notify-service;mo REVOVERED: random servicecheck recovered', 'service_description' => 'i0test_random_18', 'plugin_output' => 'mo REVOVERED: random servicecheck recovered', 'state' => '0', 'host_name' => 'i0test_host_180', 'class' => '3', },
+    { 'time' => '1261685289', 'type' => 'SERVICE NOTIFICATION', 'options' => 'test_contact;i0test_host_180;i0test_random_18;OK;notify-service;mo REVOVERED: random servicecheck recovered', 'service_description' => 'i0test_random_18', 'plugin_output' => 'mo REVOVERED: random servicecheck recovered', 'state' => '0', 'host_name' => 'i0test_host_180', 'class' => '3', 'contact_name' => 'test_contact' },
 ];
 
 my $expected = [
@@ -35,7 +35,7 @@ my $expected = [
     {'plugin_output' => 'mo CRITICAL: random servicecheck critical','service_description' => 'i0test_random_18','options' => 'i0test_host_132;i0test_random_18;CRITICAL;HARD;1;mo CRITICAL: random servicecheck critical','time' => '1261686484','state' => 2,'host_name' => 'i0test_host_132','type' => 'SERVICE ALERT','class' => '1','hard' => 1},
     {'service_description' => 'test','options' => 'localhost;test;STARTED; Service has entered a period of scheduled downtime','time' => '1262850822','state' => '0','host_name' => 'localhost','type' => 'SERVICE DOWNTIME ALERT','class' => '1','start' => 1},
     {'service_description' => 'i0test_flap_01','options' => 'i0test_host_135;i0test_flap_01;STARTED; Service appears to have started flapping (24.2% change >= 20.0% threshold)','time' => '1261686379','host_name' => 'i0test_host_135','class' => '1','type' => 'SERVICE FLAPPING ALERT','state' => '0'},
-    {'plugin_output' => 'mo REVOVERED: random servicecheck recovered','service_description' => 'i0test_random_18','options' => 'test_contact;i0test_host_180;i0test_random_18;OK;notify-service;mo REVOVERED: random servicecheck recovered','time' => '1261685289','state' => '0','host_name' => 'i0test_host_180','type' => 'SERVICE NOTIFICATION','class' => '3'}
+    {'plugin_output' => 'mo REVOVERED: random servicecheck recovered','service_description' => 'i0test_random_18','options' => 'test_contact;i0test_host_180;i0test_random_18;OK;notify-service;mo REVOVERED: random servicecheck recovered','time' => '1261685289','state' => '0','host_name' => 'i0test_host_180','type' => 'SERVICE NOTIFICATION','class' => '3', 'contact_name' => 'test_contact' }
 ];
 
 my $mal = Monitoring::Availability::Logs->new();
