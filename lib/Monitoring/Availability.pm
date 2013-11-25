@@ -6,6 +6,7 @@ use warnings;
 use Data::Dumper;
 use Carp;
 use POSIX qw(strftime mktime);
+use File::Temp qw/tempfile/;
 use Monitoring::Availability::Logs;
 
 our $VERSION = '0.48';
@@ -600,9 +601,10 @@ sub _compute_availability_line_by_line {
 
     # process all log lines we got
     # logs should be sorted already
-    while(<$fh>) {
-        chop;
-        my $data = &Monitoring::Availability::Logs::parse_line($_);
+    while(my $line = <$fh>) {
+        &Monitoring::Availability::Logs::_decode_any($line);
+        chomp($line);
+        my $data = &Monitoring::Availability::Logs::parse_line($line);
         next unless $data;
         &_compute_for_data($self,$last_time, $data, $result);
         # set timestamp of last log line
@@ -1053,7 +1055,10 @@ sub _set_service_event {
         # we got a last state?
         if(defined $service_hist->{'last_state'}) {
             my $diff = $data->{'time'} - $service_hist->{'last_state_time'};
-
+            if($diff < 0) {
+                #die("report failed, debug data is available in ".$self->_write_debug_file("added negative time"));
+                $diff = 0;
+            }
             # outside timeperiod
             if(defined $self->{'in_timeperiod'} and !$self->{'in_timeperiod'}) {
                 $self->_add_time($service_data, $data->{'time'}, 'time_indeterminate_outside_timeperiod', $diff);
@@ -1637,7 +1642,7 @@ sub _get_break_timestr {
     elsif($self->{'report_options'}->{'breakdown'} == BREAK_MONTHS) {
         return strftime('%Y-%m', @localtime);
     }
-    die('huh?');
+    die("report failed, debug data is available in ".$self->_write_debug_file("unknown break definition"));
     return;
 }
 
@@ -1666,6 +1671,20 @@ sub _set_breakpoints {
         $last_isdst = $isdst;
     }
     return;
+}
+
+########################################
+sub _write_debug_file {
+    my($self, $msg) = @_;
+    my($fh, $filename) = tempfile();
+    print $fh "error: $msg\n";
+    print $fh "version: $VERSION\n\n";
+    print $fh Dumper($self), "\n\n";
+    close($fh);
+    if($self->{'report_options'}->{'log_file'}) {
+        `cat "$self->{'report_options'}->{'log_file'}" >> $filename`;
+    }
+    return $filename;
 }
 
 ########################################

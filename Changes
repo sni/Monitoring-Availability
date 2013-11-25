@@ -1,7 +1,8 @@
 Revision history for Perl extension Monitoring::Availability.
 
-next:
+0.48  ...
     - added notifications to parser
+    - fixed encoding problem
     - fixed problem with daylightsaving change
     - fixed problem with host events in service availability
 

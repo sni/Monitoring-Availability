@@ -11,3 +11,5 @@ after.txt
 before.txt
 test.pl
 nytprof
+MYMETA.json
+MYMETA.yml

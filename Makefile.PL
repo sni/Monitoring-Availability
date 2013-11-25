@@ -6,6 +6,7 @@ perl_version '5.008';
 license      'perl';
 
 requires 'Test::More'        => '0.87';
+requires 'Encode'            => '0';
 
 #test_requires 'Test::Pod' => 1.14;
 #test_requires 'Test::Perl::Critic';
