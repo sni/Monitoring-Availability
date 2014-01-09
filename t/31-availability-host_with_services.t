@@ -62,7 +62,7 @@ my $expected = {
 };
 
 my $expected_condensed_log = [
-    { 'start' => '2010-01-22 00:00:00', 'end' => '2010-01-22 22:11:09', 'duration' => '0d 22h 11m 9s',  'type' => 'HOST UP (HARD)',     'plugin_output' => 'n0_test_host_001 (checked by mo) OK: ok hostcheck', 'class' => 'UP', 'in_downtime' => 0 },
+    { 'start' => '2010-01-22 00:00:00', 'end' => '2010-01-22 22:11:09', 'duration' => '0d 22h 11m 9s',  'type' => 'HOST UP (HARD)',     'plugin_output' => 'n0_test_host_001 (checked by mo) OK: ok hostcheck', 'class' => 'UP', 'in_downtime' => 0, 'host' => 'n0_test_host_001' },
 ];
 
 my $expected_full_log = [
@@ -74,7 +74,7 @@ my $expected_full_log = [
     { 'start' => '2010-01-17 17:03:58', 'end' => '2010-01-17 17:04:57', 'duration' => '0d 0h 0m 59s',   'type' => 'PROGRAM (RE)START',  'plugin_output' => 'Program start',                 'class' => 'INDETERMINATE' },
     { 'start' => '2010-01-17 17:04:57', 'end' => '2010-01-17 17:05:00', 'duration' => '0d 0h 0m 3s',    'type' => 'PROGRAM END',        'plugin_output' => 'Normal program termination',    'class' => 'INDETERMINATE' },
     { 'start' => '2010-01-17 17:05:00', 'end' => '2010-01-22 00:00:00', 'duration' => '4d 6h 55m 0s',   'type' => 'PROGRAM (RE)START',  'plugin_output' => 'Program start',                 'class' => 'INDETERMINATE' },
-    { 'start' => '2010-01-22 00:00:00', 'end' => '2010-01-22 22:11:09', 'duration' => '0d 22h 11m 9s',  'type' => 'HOST UP (HARD)',     'plugin_output' => 'n0_test_host_001 (checked by mo) OK: ok hostcheck', 'class' => 'UP', 'in_downtime' => 0 },
+    { 'start' => '2010-01-22 00:00:00', 'end' => '2010-01-22 22:11:09', 'duration' => '0d 22h 11m 9s',  'type' => 'HOST UP (HARD)',     'plugin_output' => 'n0_test_host_001 (checked by mo) OK: ok hostcheck', 'class' => 'UP', 'in_downtime' => 0, 'host' => 'n0_test_host_001' },
     { 'start' => '2010-01-22 22:11:09', 'end' => '2010-01-22 22:12:22', 'duration' => '0d 0h 1m 13s',   'type' => 'PROGRAM END',        'plugin_output' => 'Normal program termination',    'class' => 'INDETERMINATE' },
     { 'start' => '2010-01-22 22:12:22', 'end' => '2010-01-23 23:03:54', 'duration' => '1d 0h 51m 32s',  'type' => 'PROGRAM (RE)START',  'plugin_output' => 'Program start',                 'class' => 'INDETERMINATE' },
     { 'start' => '2010-01-23 23:03:54', 'end' => '2010-01-23 23:03:57', 'duration' => '0d 0h 0m 3s',    'type' => 'PROGRAM END',        'plugin_output' => 'Normal program termination',    'class' => 'INDETERMINATE' },

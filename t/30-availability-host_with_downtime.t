@@ -53,16 +53,16 @@ my $expected = {
 };
 
 my $expected_condensed_log = [
-    { 'start' => '2010-01-09 00:00:00', end => '2010-01-09 14:11:33', 'duration' => '0d 14h 11m 33s',  'type' => 'HOST UP (HARD)',      plugin_output => 'n0_test_host_000 ...',        'class' => 'UP', 'in_downtime' => 0 },
-    { 'start' => '2010-01-09 14:11:33', end => '2010-01-09 14:22:53', 'duration' => '0d 0h 11m 20s',   'type' => 'HOST DOWNTIME START', plugin_output => 'Start of scheduled downtime', 'class' => 'INDETERMINATE', 'in_downtime' => 1 },
-    { 'start' => '2010-01-09 14:22:53', end => '2010-01-09 14:25:55', 'duration' => '0d 0h 3m 2s',     'type' => 'HOST DOWNTIME STOP',  plugin_output => 'End of scheduled downtime',   'class' => 'INDETERMINATE', 'in_downtime' => 0 },
+    { 'start' => '2010-01-09 00:00:00', end => '2010-01-09 14:11:33', 'duration' => '0d 14h 11m 33s',  'type' => 'HOST UP (HARD)',      plugin_output => 'n0_test_host_000 ...',        'class' => 'UP', 'in_downtime' => 0, 'host' => 'n0_test_host_000' },
+    { 'start' => '2010-01-09 14:11:33', end => '2010-01-09 14:22:53', 'duration' => '0d 0h 11m 20s',   'type' => 'HOST DOWNTIME START', plugin_output => 'Start of scheduled downtime', 'class' => 'INDETERMINATE', 'in_downtime' => 1, 'host' => 'n0_test_host_000' },
+    { 'start' => '2010-01-09 14:22:53', end => '2010-01-09 14:25:55', 'duration' => '0d 0h 3m 2s',     'type' => 'HOST DOWNTIME STOP',  plugin_output => 'End of scheduled downtime',   'class' => 'INDETERMINATE', 'in_downtime' => 0, 'host' => 'n0_test_host_000' },
 ];
 
 my $expected_full_log = [
     { 'start' => '2010-01-08 15:50:52', end => '2010-01-09 00:00:00', 'duration' => '0d 8h 9m 8s',  'type' => 'PROGRAM (RE)START', plugin_output => 'Program start', 'class' => 'INDETERMINATE' },
-    { 'start' => '2010-01-09 00:00:00', end => '2010-01-09 14:11:33', 'duration' => '0d 14h 11m 33s',  'type' => 'HOST UP (HARD)',      plugin_output => 'n0_test_host_000 ...',        'class' => 'UP', 'in_downtime' => 0 },
-    { 'start' => '2010-01-09 14:11:33', end => '2010-01-09 14:22:53', 'duration' => '0d 0h 11m 20s',   'type' => 'HOST DOWNTIME START', plugin_output => 'Start of scheduled downtime', 'class' => 'INDETERMINATE', 'in_downtime' => 1 },
-    { 'start' => '2010-01-09 14:22:53', end => '2010-01-09 14:25:55', 'duration' => '0d 0h 3m 2s',     'type' => 'HOST DOWNTIME STOP',  plugin_output => 'End of scheduled downtime',   'class' => 'INDETERMINATE', 'in_downtime' => 0 },
+    { 'start' => '2010-01-09 00:00:00', end => '2010-01-09 14:11:33', 'duration' => '0d 14h 11m 33s',  'type' => 'HOST UP (HARD)',      plugin_output => 'n0_test_host_000 ...',        'class' => 'UP', 'in_downtime' => 0, 'host' => 'n0_test_host_000' },
+    { 'start' => '2010-01-09 14:11:33', end => '2010-01-09 14:22:53', 'duration' => '0d 0h 11m 20s',   'type' => 'HOST DOWNTIME START', plugin_output => 'Start of scheduled downtime', 'class' => 'INDETERMINATE', 'in_downtime' => 1, 'host' => 'n0_test_host_000' },
+    { 'start' => '2010-01-09 14:22:53', end => '2010-01-09 14:25:55', 'duration' => '0d 0h 3m 2s',     'type' => 'HOST DOWNTIME STOP',  plugin_output => 'End of scheduled downtime',   'class' => 'INDETERMINATE', 'in_downtime' => 0, 'host' => 'n0_test_host_000' },
     { 'start' => '2010-01-09 14:25:55', end => '2010-01-09 14:26:00', 'duration' => '0d 0h 0m 5s',  'type' => 'PROGRAM END', plugin_output => 'Normal program termination', 'class' => 'INDETERMINATE' },
     { 'start' => '2010-01-09 14:26:00', end => '2010-01-14 20:54:10', 'duration' => '5d 6h 28m 10s+',  'type' => 'PROGRAM (RE)START', plugin_output => 'Program start', 'class' => 'INDETERMINATE' },
 ];

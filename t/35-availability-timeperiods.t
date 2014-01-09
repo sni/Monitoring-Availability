@@ -68,15 +68,15 @@ my $expected = {
 };
 
 my $expected_log = [
-    { 'plugin_output' => 'service is ok',   'duration' => '0d 0h 0m 40s', 'class' => 'OK',       'type' => 'SERVICE OK (HARD)',       'end' => '2010-01-09 00:00:40', 'start' => '2010-01-09 00:00:00', 'in_downtime' => 0 },
-    { 'plugin_output' => 'service is down', 'duration' => '0d 0h 1m 10s', 'class' => 'CRITICAL', 'type' => 'SERVICE CRITICAL (HARD)', 'end' => '2010-01-09 00:01:50', 'start' => '2010-01-09 00:00:40', 'in_downtime' => 0 },
-    { 'plugin_output' => 'service is ok',   'duration' => '0d 0h 3m 10s', 'class' => 'OK',       'type' => 'SERVICE OK (HARD)',       'end' => '2010-01-09 00:05:00', 'start' => '2010-01-09 00:01:50', 'in_downtime' => 0 },
+    { 'plugin_output' => 'service is ok',   'duration' => '0d 0h 0m 40s', 'class' => 'OK',       'type' => 'SERVICE OK (HARD)',       'end' => '2010-01-09 00:00:40', 'start' => '2010-01-09 00:00:00', 'in_downtime' => 0, 'host' => 'testhost', 'service' => 'testservice' },
+    { 'plugin_output' => 'service is down', 'duration' => '0d 0h 1m 10s', 'class' => 'CRITICAL', 'type' => 'SERVICE CRITICAL (HARD)', 'end' => '2010-01-09 00:01:50', 'start' => '2010-01-09 00:00:40', 'in_downtime' => 0, 'host' => 'testhost', 'service' => 'testservice' },
+    { 'plugin_output' => 'service is ok',   'duration' => '0d 0h 3m 10s', 'class' => 'OK',       'type' => 'SERVICE OK (HARD)',       'end' => '2010-01-09 00:05:00', 'start' => '2010-01-09 00:01:50', 'in_downtime' => 0, 'host' => 'testhost', 'service' => 'testservice' },
 ];
 my $expected_full_log = [
     { 'plugin_output' => 'Program start',   'duration' => '0d 0h 0m 0s',  'class' => 'INDETERMINATE', 'type' => 'PROGRAM (RE)START',       'end' => '2010-01-09 00:00:00', 'start' => '2010-01-09 00:00:00' },
-    { 'plugin_output' => 'service is ok',   'duration' => '0d 0h 0m 40s', 'class' => 'OK',            'type' => 'SERVICE OK (HARD)',       'end' => '2010-01-09 00:00:40', 'start' => '2010-01-09 00:00:00', 'in_downtime' => 0 },
-    { 'plugin_output' => 'service is down', 'duration' => '0d 0h 1m 10s', 'class' => 'CRITICAL',      'type' => 'SERVICE CRITICAL (HARD)', 'end' => '2010-01-09 00:01:50', 'start' => '2010-01-09 00:00:40', 'in_downtime' => 0 },
-    { 'plugin_output' => 'service is ok',   'duration' => '0d 0h 3m 10s', 'class' => 'OK',            'type' => 'SERVICE OK (HARD)',       'end' => '2010-01-09 00:05:00', 'start' => '2010-01-09 00:01:50', 'in_downtime' => 0 },
+    { 'plugin_output' => 'service is ok',   'duration' => '0d 0h 0m 40s', 'class' => 'OK',            'type' => 'SERVICE OK (HARD)',       'end' => '2010-01-09 00:00:40', 'start' => '2010-01-09 00:00:00', 'in_downtime' => 0, 'host' => 'testhost', 'service' => 'testservice' },
+    { 'plugin_output' => 'service is down', 'duration' => '0d 0h 1m 10s', 'class' => 'CRITICAL',      'type' => 'SERVICE CRITICAL (HARD)', 'end' => '2010-01-09 00:01:50', 'start' => '2010-01-09 00:00:40', 'in_downtime' => 0, 'host' => 'testhost', 'service' => 'testservice' },
+    { 'plugin_output' => 'service is ok',   'duration' => '0d 0h 3m 10s', 'class' => 'OK',            'type' => 'SERVICE OK (HARD)',       'end' => '2010-01-09 00:05:00', 'start' => '2010-01-09 00:01:50', 'in_downtime' => 0, 'host' => 'testhost', 'service' => 'testservice' },
     {                                       'duration' => '0d 0h 0m 0s',                                                                   'end' => '2010-01-09 00:05:00', 'start' => '2010-01-09 00:05:00' },
     { 'plugin_output' => 'Normal program termination',
                                             'duration' => '0d 0h 0m 0s+', 'class' => 'INDETERMINATE', 'type' => 'PROGRAM END',             'end' => '2010-01-09 00:05:00', 'start' => '2010-01-09 00:05:00' },
@@ -103,18 +103,18 @@ TestUtils::check_array_one_by_one($expected_full_log, $full_logs, 'full logs');
 #########################
 # now with timeperiod
 $expected_log = [
-    { 'plugin_output' => 'service is ok',   'duration' => '0d 0h 0m 0s',  'class' => 'OK',       'type' => 'SERVICE OK (HARD)',       'end' => '2010-01-09 00:00:00', 'start' => '2010-01-09 00:00:00', 'in_downtime' => 0 },
-    { 'plugin_output' => 'service is down', 'duration' => '0d 0h 1m 0s',  'class' => 'CRITICAL', 'type' => 'SERVICE CRITICAL (HARD)', 'end' => '2010-01-09 00:01:40', 'start' => '2010-01-09 00:00:40', 'in_downtime' => 0 },
-    { 'plugin_output' => 'service is ok',   'duration' => '0d 0h 3m 10s', 'class' => 'OK',       'type' => 'SERVICE OK (HARD)',       'end' => '2010-01-09 00:05:00', 'start' => '2010-01-09 00:01:50', 'in_downtime' => 0 },
+    { 'plugin_output' => 'service is ok',   'duration' => '0d 0h 0m 0s',  'class' => 'OK',       'type' => 'SERVICE OK (HARD)',       'end' => '2010-01-09 00:00:00', 'start' => '2010-01-09 00:00:00', 'in_downtime' => 0, 'host' => 'testhost', 'service' => 'testservice' },
+    { 'plugin_output' => 'service is down', 'duration' => '0d 0h 1m 0s',  'class' => 'CRITICAL', 'type' => 'SERVICE CRITICAL (HARD)', 'end' => '2010-01-09 00:01:40', 'start' => '2010-01-09 00:00:40', 'in_downtime' => 0, 'host' => 'testhost', 'service' => 'testservice' },
+    { 'plugin_output' => 'service is ok',   'duration' => '0d 0h 3m 10s', 'class' => 'OK',       'type' => 'SERVICE OK (HARD)',       'end' => '2010-01-09 00:05:00', 'start' => '2010-01-09 00:01:50', 'in_downtime' => 0, 'host' => 'testhost', 'service' => 'testservice' },
 ];
 $expected_full_log = [
     { 'plugin_output' => 'Program start',                  'duration' => '0d 0h 0m 0s',  'class' => 'INDETERMINATE',    'type' => 'PROGRAM (RE)START',          'end' => '2010-01-09 00:00:00', 'start' => '2010-01-09 00:00:00' },
-    { 'plugin_output' => 'service is ok',                  'duration' => '0d 0h 0m 0s',  'class' => 'OK',               'type' => 'SERVICE OK (HARD)',          'end' => '2010-01-09 00:00:00', 'start' => '2010-01-09 00:00:00', 'in_downtime' => 0 },
+    { 'plugin_output' => 'service is ok',                  'duration' => '0d 0h 0m 0s',  'class' => 'OK',               'type' => 'SERVICE OK (HARD)',          'end' => '2010-01-09 00:00:00', 'start' => '2010-01-09 00:00:00', 'in_downtime' => 0, 'host' => 'testhost', 'service' => 'testservice' },
     { 'plugin_output' => 'entering timeperiod: workhours', 'duration' => '0d 0h 0m 30s', 'class' => 'INDETERMINATE',    'type' => 'TIMEPERIOD START',           'end' => '2010-01-09 00:00:30', 'start' => '2010-01-09 00:00:00' },
     { 'plugin_output' => 'leaving timeperiod: workhours',  'duration' => '0d 0h 0m 10s', 'class' => 'INDETERMINATE',    'type' => 'TIMEPERIOD STOP',            'end' => '2010-01-09 00:00:40', 'start' => '2010-01-09 00:00:30' },
-    { 'plugin_output' => 'service is down',                'duration' => '0d 0h 1m 0s',  'class' => 'CRITICAL',         'type' => 'SERVICE CRITICAL (HARD)',    'end' => '2010-01-09 00:01:40', 'start' => '2010-01-09 00:00:40', 'in_downtime' => 0 },
+    { 'plugin_output' => 'service is down',                'duration' => '0d 0h 1m 0s',  'class' => 'CRITICAL',         'type' => 'SERVICE CRITICAL (HARD)',    'end' => '2010-01-09 00:01:40', 'start' => '2010-01-09 00:00:40', 'in_downtime' => 0, 'host' => 'testhost', 'service' => 'testservice' },
     { 'plugin_output' => 'entering timeperiod: workhours', 'duration' => '0d 0h 0m 10s', 'class' => 'INDETERMINATE',    'type' => 'TIMEPERIOD START',           'end' => '2010-01-09 00:01:50', 'start' => '2010-01-09 00:01:40' },
-    { 'plugin_output' => 'service is ok',                  'duration' => '0d 0h 3m 10s', 'class' => 'OK',               'type' => 'SERVICE OK (HARD)',          'end' => '2010-01-09 00:05:00', 'start' => '2010-01-09 00:01:50', 'in_downtime' => 0 },
+    { 'plugin_output' => 'service is ok',                  'duration' => '0d 0h 3m 10s', 'class' => 'OK',               'type' => 'SERVICE OK (HARD)',          'end' => '2010-01-09 00:05:00', 'start' => '2010-01-09 00:01:50', 'in_downtime' => 0, 'host' => 'testhost', 'service' => 'testservice' },
     {                                                      'duration' => '0d 0h 0m 0s',                                                                         'end' => '2010-01-09 00:05:00', 'start' => '2010-01-09 00:05:00' },
     { 'plugin_output' => 'Normal program termination',     'duration' => '0d 0h 0m 0s+', 'class' => 'INDETERMINATE',    'type' => 'PROGRAM END',                'end' => '2010-01-09 00:05:00', 'start' => '2010-01-09 00:05:00' }
 ];
