@@ -37,6 +37,7 @@ t/34-availability-breakdown.t
 t/35-availability-timeperiods.t
 t/36-availability-nologs.t
 t/37-availability-no_initial_log.t
+t/38-availability-breakdown2.t
 t/92_clean_debug.t
 t/92_todo.t
 t/93-manifest.t
