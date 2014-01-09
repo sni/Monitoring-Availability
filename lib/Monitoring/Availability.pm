@@ -1662,7 +1662,7 @@ sub _set_breakpoints {
     my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($cur);
     my $last_isdst = $isdst;
     $cur = mktime(0, 0, 0, $mday, $mon, $year, $wday, $yday, $isdst);
-    while($cur < $self->{'report_options'}->{'end'}) {
+    while($cur >= $self->{'report_options'}->{'start'} and $cur < $self->{'report_options'}->{'end'}) {
         push @{$self->{'breakpoints'}}, $cur;
         $cur = $cur + 86400;
         my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($cur);
