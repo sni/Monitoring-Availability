@@ -866,7 +866,6 @@ sub _process_log_line {
                 $start         = 'START';
             }
             $self->_add_log_entry(
-                            'full_only'   => 1,
                             'log'         => {
                                 'start'         => $data->{'time'},
                                 'type'          => 'TIMEPERIOD '.$start,
@@ -1657,14 +1656,15 @@ sub _set_breakpoints {
 
     return if $self->{'report_options'}->{'breakdown'} == BREAK_NONE;
 
-    my $cur = $self->{'report_options'}->{'start'};
+    my $cur   = $self->{'report_options'}->{'start'};
+    my $start = $self->{'report_options'}->{'start'} - 86400;
     # round to next 0:00
     my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($cur);
     $cur = mktime(0, 0, 0, $mday, $mon, $year, $wday, $yday, $isdst);
-    while($cur >= $self->{'report_options'}->{'start'} and $cur < $self->{'report_options'}->{'end'}) {
+    while($cur < $self->{'report_options'}->{'end'}) {
         my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($cur);
         $cur = mktime(0, 0, 0, $mday, $mon, $year, $wday, $yday, $isdst);
-        push @{$self->{'breakpoints'}}, $cur;
+        push @{$self->{'breakpoints'}}, $cur if $cur >= $start;
         $cur = $cur + 86400;
     }
     return;
