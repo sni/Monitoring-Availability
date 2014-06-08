@@ -218,7 +218,9 @@ sub new {
 
  calculate()
 
-Calculate the availability
+Calculate the availability.
+
+Returns hash with the availability.
 
 =over 4
 
@@ -1736,7 +1738,7 @@ L<http://github.com/sni/Monitoring-Availability>
 
 =head1 AUTHOR
 
-Sven Nierlein, E<lt>nierlein@cpan.orgE<gt>
+Sven Nierlein, 2009-2014, <sven@nierlein.org>
 
 =head1 COPYRIGHT AND LICENSE
 
