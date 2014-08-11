@@ -615,12 +615,19 @@ sub _compute_availability_line_by_line {
 
     my $last_time = -1;
 
+    chomp(my $total = `wc -l $file`);
+    $total =~ s/^(\d+)\s.*$/$1/mx;
+
     open(my $fh, '<', $file) or die("cannot read ".$file.": ".$!);
     binmode($fh);
 
     # process all log lines we got
     # logs should be sorted already
+    my $count     = 0;
+    my $last_perc = 35;  # our range is from 35% - 75%
+    my $started   = time();
     while(my $line = <$fh>) {
+        $count++;
         &Monitoring::Availability::Logs::_decode_any($line);
         chomp($line);
         my $data = &Monitoring::Availability::Logs::parse_line($line);
@@ -628,6 +635,16 @@ sub _compute_availability_line_by_line {
         &_compute_for_data($self,$last_time, $data, $result);
         # set timestamp of last log line
         $last_time = $data->{'time'};
+
+        if($ENV{'THRUK_JOB_DIR'} && $count%10 == 0) {
+            my $perc = int(($count / $total * 40) + 35);
+            if($perc != $last_perc) {
+                my $elapsed = time() - $started;
+                my $remaining_seconds = int(($elapsed) / ($count / $total)) - $elapsed;
+                Thruk::Utils::External::update_status($ENV{'THRUK_JOB_DIR'}, $perc, 'calculating', $remaining_seconds);
+            }
+            $last_perc = $perc;
+        }
     }
     close($fh);
 
