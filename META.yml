@@ -1,7 +1,7 @@
 ---
 abstract: 'Calculate Availability Data from'
 author:
-  - 'Sven Nierlein, <nierlein@cpan.org>'
+  - 'Sven Nierlein, 2009-2014, <sven@nierlein.org>'
 build_requires:
   ExtUtils::MakeMaker: 6.59
 configure_requires:
