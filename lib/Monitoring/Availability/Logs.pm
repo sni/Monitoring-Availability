@@ -3,9 +3,7 @@ package Monitoring::Availability::Logs;
 use 5.008;
 use strict;
 use warnings;
-use Data::Dumper;
 use Carp;
-use POSIX qw(strftime);
 use Encode qw/decode/;
 
 use constant {
@@ -59,8 +57,7 @@ Creates an C<Monitoring::Availability::Log> object.
 =cut
 
 sub new {
-    my $class = shift;
-    my(%options) = @_;
+    my($class, %options) = @_;
 
     my $self = {
         'verbose'        => 0,       # enable verbose output
@@ -84,13 +81,6 @@ sub new {
 
     # create an empty log store
     $self->{'logs'} = [];
-
-    $self->{'xs'} = 0;
-    eval {
-        require Thruk::Utils::XS;
-        Thruk::Utils::XS->import();
-        $self->{'xs'} = 1;
-    };
 
     # which source do we use?
     if(defined $self->{'log_string'}) {
@@ -136,11 +126,10 @@ return parsed logfile line
 
 =cut
 
+## no critic (Subroutines::RequireArgUnpacking)
 sub parse_line {
     return if substr($_[0], 0, 1, '') ne '[';
-    my $return = {
-        'time' => substr($_[0], 0, 10, '')
-    };
+    my $return = { 'time' => substr($_[0], 0, 10, '') };
     substr($_[0], 0, 2, '');
 
     ($return->{'type'},$_[0]) = split(/:\ /mxo, $_[0], 2);
@@ -155,6 +144,7 @@ sub parse_line {
 
     return $return;
 }
+## use critic
 
 ########################################
 # INTERNAL SUBS
@@ -162,12 +152,8 @@ sub parse_line {
 sub _store_logs_from_string {
     my($self, $string) = @_;
     return unless defined $string;
-    my $parse_line = \&parse_line;
-    if($self->{xs}) {
-        $parse_line = \&Thruk::Utils::XS::parse_line;
-    }
     for my $line (split/\n/mxo, $string) {
-        my $data = &{$parse_line}($line);
+        my $data = &parse_line($line);
         push @{$self->{'logs'}}, $data if defined $data;
     }
     return 1;
@@ -177,16 +163,12 @@ sub _store_logs_from_string {
 sub _store_logs_from_file {
     my($self, $file) = @_;
     return unless defined $file;
-    my $parse_line = \&parse_line;
-    if($self->{xs}) {
-        $parse_line = \&Thruk::Utils::XS::parse_line;
-    }
     open(my $FH, '<', $file) or croak('cannot read file '.$file.': '.$!);
     binmode($FH);
     while(my $line = <$FH>) {
         &_decode_any($line);
         chomp($line);
-        my $data = &{$parse_line}($line);
+        my $data = &parse_line($line);
         push @{$self->{'logs'}}, $data if defined $data;
     }
     close($FH);
@@ -215,7 +197,7 @@ sub _store_logs_from_livestatus {
     my($self, $log_array) = @_;
     return unless defined $log_array;
     for my $entry (@{$log_array}) {
-        my $data = $self->_parse_livestatus_entry($entry);
+        my $data = &_parse_livestatus_entry($entry);
         push @{$self->{'logs'}}, $data if defined $data;
     }
     return 1;
@@ -223,7 +205,7 @@ sub _store_logs_from_livestatus {
 
 ########################################
 sub _parse_livestatus_entry {
-    my($self, $entry) = @_;
+    my($entry) = @_;
 
     my $string = $entry->{'message'} || $entry->{'options'} || '';
     if($string eq '') {
@@ -232,14 +214,9 @@ sub _parse_livestatus_entry {
         return $entry;
     }
 
-    my $parse_line = \&parse_line;
-    if($self->{xs}) {
-        $parse_line = \&Thruk::Utils::XS::parse_line;
-    }
-
     # extract more information from our options
     if($entry->{'message'}) {
-        return &{$parse_line}($string);
+        return &parse_line($string);
     } else {
         &_set_from_options($entry->{'type'}, $entry, $string);
     }
