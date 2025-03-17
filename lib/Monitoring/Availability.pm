@@ -1,13 +1,14 @@
 package Monitoring::Availability;
 
-use 5.008;
-use strict;
 use warnings;
-use Data::Dumper qw/Dumper/;
+use strict;
 use Carp qw/croak/;
-use POSIX ();
+use Data::Dumper qw/Dumper/;
 use File::Temp qw/tempfile/;
+use POSIX ();
+
 use Monitoring::Availability::Logs ();
+use Thruk::Utils::External ();
 
 our $VERSION = '0.48';
 
@@ -327,7 +328,6 @@ sub calculate {
         'timeformat'                     => $self->{'timeformat'},
         'breakdown'                      => $self->{'breakdown'},
     };
-    my $result;
 
     for my $opt_key (keys %opts) {
         if(exists $self->{'report_options'}->{$opt_key}) {
@@ -344,9 +344,32 @@ sub calculate {
     $self->_log('calculate()')             if $verbose;
     $self->_log($self->{'report_options'}) if $verbose;
 
+    # if we have more than one host or service, we dont build up a log
+    $self->{'report_options'}->{'build_log'} = TRUE;
+    if(scalar @{$self->{'report_options'}->{'hosts'}} == 1 && scalar @{$self->{'report_options'}->{'services'}} == 0) {
+        $self->{'report_options'}->{'build_log'} = HOST_ONLY;
+    }
+    elsif(scalar @{$self->{'report_options'}->{'services'}} == 1) {
+        $self->{'report_options'}->{'build_log'} = SERVICE_ONLY;
+    }
+
+    # set some variables for faster access
+    $report_options_start             = $self->{'report_options'}->{'start'};
+    $report_options_end               = $self->{'report_options'}->{'end'};
+    $report_options_includesoftstates = $self->{'report_options'}->{'includesoftstates'};
+
+    my $result = {
+        'hosts'     => {},
+        'services'  => {},
+        'total'     => {
+            'start'                                 => $report_options_start,
+            'end'                                   => $report_options_end,
+            'duration'                              => $report_options_end - $report_options_start,
+            'time_indeterminate_outside_timeperiod' => 0,
+        },
+    };
+
     # create lookup hash for faster access
-    $result->{'hosts'}    = {};
-    $result->{'services'} = {};
     for my $host (@{$self->{'report_options'}->{'hosts'}}) {
         $result->{'hosts'}->{$host} = 1;
     }
@@ -360,20 +383,12 @@ sub calculate {
         $result->{'services'}->{$service->{'host'}}->{$service->{'service'}} = 1;
     }
 
-    # if we have more than one host or service, we dont build up a log
-    $self->{'report_options'}->{'build_log'} = TRUE;
-    if(scalar @{$self->{'report_options'}->{'hosts'}} == 1) {
-        $self->{'report_options'}->{'build_log'} = HOST_ONLY;
-    }
-    elsif(scalar @{$self->{'report_options'}->{'services'}} == 1) {
-        $self->{'report_options'}->{'build_log'} = SERVICE_ONLY;
-    }
-
     $self->{'report_options'}->{'calc_all'} = FALSE;
     if(scalar keys %{$result->{'services'}} == 0 and scalar keys %{$result->{'hosts'}} == 0) {
         $self->_log('will calculate availability for all hosts/services found') if $verbose;
         $self->{'report_options'}->{'calc_all'} = TRUE;
     }
+    $report_options_calc_all = $self->{'report_options'}->{'calc_all'};
 
     $self->_set_breakpoints();
 
@@ -381,12 +396,6 @@ sub calculate {
         $self->_set_empty_hosts($result);
         $self->_set_empty_services($result);
     }
-
-    # set some variables for faster access
-    $report_options_start             = $self->{'report_options'}->{'start'};
-    $report_options_end               = $self->{'report_options'}->{'end'};
-    $report_options_includesoftstates = $self->{'report_options'}->{'includesoftstates'};
-    $report_options_calc_all          = $self->{'report_options'}->{'calc_all'};
 
     # read in logs
     if($self->{'report_options'}->{'log_file'} && !$self->{'report_options'}->{'log_string'} && !$self->{'report_options'}->{'log_dir'}) {
@@ -634,7 +643,7 @@ sub _compute_availability_line_by_line {
     while(my $line = <$fh>) {
         $count++;
         my $data;
-        &Monitoring::Availability::Logs::_decode_any($line);
+        &Monitoring::Availability::Logs::decode_any($line);
         chomp($line);
         if($xs) {
             $data = &Thruk::Utils::XS::parse_line($line);
@@ -689,7 +698,7 @@ sub _compute_availability_from_iterator {
     # logs should be sorted already
     while(my $data = $logs->next) {
         &_compute_for_data($self, $last_time,
-                                 &Monitoring::Availability::Logs::_parse_livestatus_entry($data),
+                                 &Monitoring::Availability::Logs::parse_livestatus_entry($data),
                                  $result);
 
         # set timestamp of last log line
@@ -733,7 +742,7 @@ sub _compute_availability_on_the_fly {
                                          $result);
             } else {
                 &_compute_for_data($self, $last_time,
-                                         &Monitoring::Availability::Logs::_parse_livestatus_entry($data),
+                                         &Monitoring::Availability::Logs::parse_livestatus_entry($data),
                                          $result);
             }
             # set timestamp of last log line
@@ -830,6 +839,7 @@ sub _process_log_line {
 
     # process starts / stops?
     if(defined $data->{'proc_start'}) {
+        &_set_system_event($self, $result, $data );
         unless($self->{'report_options'}->{'assumestatesduringnotrunning'}) {
             if($data->{'proc_start'} == START_NORMAL or $data->{'proc_start'} == START_RESTART) {
                 # set an event for all services and set state to no_data
@@ -909,6 +919,7 @@ sub _process_log_line {
                 $last_state = $last_known_state if(defined $last_known_state and $last_known_state >= 0);
                 &_set_host_event($self,$host_name, $result, { 'time' => $data->{'time'}, 'state' => $last_state });
             }
+            &_set_system_event($self, $result, $data );
             $self->{'in_timeperiod'} = $data->{'to'};
 
             # set a log entry
@@ -1045,12 +1056,9 @@ sub _process_log_line {
         elsif($data->{'type'} eq 'HOST DOWNTIME ALERT') {
             return unless $self->{'report_options'}->{'showscheduleddowntime'};
 
-            my $last_state_time = $host_hist->{'last_state_time'};
-
             $self->_log('_process_log_line() hostdowntime, inserting fake event for all hosts/services') if $verbose;
             # set an event for all services
             for my $service_description (keys %{$self->{'service_data'}->{$data->{'host_name'}}}) {
-                $last_state_time = $self->{'service_data'}->{$data->{'host_name'}}->{$service_description}->{'last_state_time'};
                 &_set_service_event($self, $data->{'host_name'}, $service_description, $result, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'} });
             }
 
@@ -1095,6 +1103,29 @@ sub _process_log_line {
     return 1;
 }
 
+########################################
+sub _set_system_event {
+    my($self, $result, $data) = @_;
+
+    $self->_log('_set_system_event()') if $verbose;
+
+    our $last_system_event;
+    $last_system_event = 0 unless defined $last_system_event;
+    my $duration = $data->{'time'} - $last_system_event;
+    $last_system_event = $data->{'time'};
+
+    # check if we are inside the report time
+    if($report_options_start >= $data->{'time'} || $report_options_end < $data->{'time'}) {
+        return;
+    }
+
+    if(!$self->{'in_timeperiod'}) {
+        $result->{'total'}->{'time_indeterminate_outside_timeperiod'} += $duration;
+        return;
+    }
+
+    return 1;
+}
 
 ########################################
 sub _set_service_event {
@@ -1319,6 +1350,8 @@ sub _insert_fake_event {
     my($self, $result, $time) = @_;
 
     $self->_log('_insert_fake_event()') if $verbose;
+    &_set_system_event($self, $result, { 'time' => $time } );
+
     for my $host (keys %{$result->{'services'}}) {
         for my $service (keys %{$result->{'services'}->{$host}}) {
             my $last_service_state = STATE_UNSPECIFIED;
@@ -1367,13 +1400,13 @@ sub _set_default_options {
     my $options = shift;
 
     $options->{'backtrack'}                      = 4             unless defined $options->{'backtrack'};
-    $options->{'assumeinitialstates'}            = 'yes'         unless defined $options->{'assumeinitialstates'};
-    $options->{'assumestateretention'}           = 'yes'         unless defined $options->{'assumestateretention'};
-    $options->{'assumestatesduringnotrunning'}   = 'yes'         unless defined $options->{'assumestatesduringnotrunning'};
-    $options->{'includesoftstates'}              = 'no'          unless defined $options->{'includesoftstates'};
+    $options->{'assumeinitialstates'}            = 1             unless defined $options->{'assumeinitialstates'};
+    $options->{'assumestateretention'}           = 1             unless defined $options->{'assumestateretention'};
+    $options->{'assumestatesduringnotrunning'}   = 1             unless defined $options->{'assumestatesduringnotrunning'};
+    $options->{'includesoftstates'}              = 0             unless defined $options->{'includesoftstates'};
     $options->{'initialassumedhoststate'}        = 'unspecified' unless defined $options->{'initialassumedhoststate'};
     $options->{'initialassumedservicestate'}     = 'unspecified' unless defined $options->{'initialassumedservicestate'};
-    $options->{'showscheduleddowntime'}          = 'yes'         unless defined $options->{'showscheduleddowntime'};
+    $options->{'showscheduleddowntime'}          = 1             unless defined $options->{'showscheduleddowntime'};
     $options->{'timeformat'}                     = '%s'          unless defined $options->{'timeformat'};
     $options->{'breakdown'}                      = BREAK_NONE    unless defined $options->{'breakdown'};
 
@@ -1400,10 +1433,10 @@ sub _verify_options {
                        showscheduleddowntime
                       /) {
         if(defined $options->{$yes_no}) {
-            if(lc $options->{$yes_no} eq 'yes') {
+            if(lc $options->{$yes_no} eq 'yes' || $options->{$yes_no} eq '1') {
                 $options->{$yes_no} = TRUE;
             }
-            elsif(lc $options->{$yes_no} eq 'no') {
+            elsif(lc $options->{$yes_no} eq 'no' || $options->{$yes_no} eq '0') {
                 $options->{$yes_no} = FALSE;
             } else {
                 croak($yes_no.' unknown, please use \'yes\' or \'no\'. Got: '.$options->{$yes_no});
@@ -1581,10 +1614,34 @@ sub _calculate_log {
         $self->_log("#################################");
     }
 
-    for(my $x = 0; $x < scalar @{$self->{'full_log_store'}}; $x++) {
+    my $logstoresize = scalar @{$self->{'full_log_store'}};
+    for(my $x = 0; $x < $logstoresize; $x++) {
         my $log_entry      = $self->{'full_log_store'}->[$x];
-        my $next_log_entry = $self->{'full_log_store'}->[$x+1];
+        my $next_log_entry;
         my $log            = $log_entry->{'log'};
+
+        # find next log entry by host / service
+        if($log->{'host'}) {
+            if($log->{'service'}) {
+                for(my $offset = 1; $offset <= $logstoresize; $offset++) {
+                    my $tmp_log = $self->{'full_log_store'}->[$x+$offset];
+                    if($tmp_log->{'log'}->{'host'} && $tmp_log->{'log'}->{'host'} eq $log->{'host'} && $tmp_log->{'log'}->{'service'} && $tmp_log->{'log'}->{'service'} eq $log->{'service'}) {
+                        $next_log_entry = $tmp_log;
+                        last;
+                    }
+                }
+            } else {
+                for(my $offset = 1; $offset <= $logstoresize; $offset++) {
+                    my $tmp_log = $self->{'full_log_store'}->[$x+$offset];
+                    if($tmp_log->{'log'}->{'host'} && $tmp_log->{'log'}->{'host'} eq $log->{'host'} && !$tmp_log->{'log'}->{'service'}) {
+                        $next_log_entry = $tmp_log;
+                        last;
+                    }
+                }
+            }
+        } else {
+            $next_log_entry = $self->{'full_log_store'}->[$x+1];
+        }
 
         # set end date of current log entry
         if(defined $next_log_entry->{'log'}->{'start'}) {
@@ -1597,8 +1654,8 @@ sub _calculate_log {
 
         # convert time format
         if($self->{'report_options'}->{'timeformat'} ne '%s') {
-            $log->{'end'}   = POSIX::strftime $self->{'report_options'}->{'timeformat'}, localtime($log->{'end'});
-            $log->{'start'} = POSIX::strftime $self->{'report_options'}->{'timeformat'}, localtime($log->{'start'});
+            $log->{'end'}   = POSIX::strftime($self->{'report_options'}->{'timeformat'}, localtime($log->{'end'}));
+            $log->{'start'} = POSIX::strftime($self->{'report_options'}->{'timeformat'}, localtime($log->{'start'}));
         }
 
         push @{$self->{'log_output'}}, $log unless defined $log_entry->{'full_only'};
@@ -1769,7 +1826,7 @@ L<http://github.com/sni/Monitoring-Availability>
 
 =head1 AUTHOR
 
-Sven Nierlein, 2009-2014, <sven@nierlein.org>
+Sven Nierlein, 2009-present, <sven@nierlein.org>
 
 =head1 COPYRIGHT AND LICENSE
 
