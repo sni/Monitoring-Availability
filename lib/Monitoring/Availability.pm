@@ -1057,12 +1057,13 @@ sub _process_log_line {
             return unless $self->{'report_options'}->{'showscheduleddowntime'};
 
             $self->_log('_process_log_line() hostdowntime, inserting fake event for all hosts/services') if $verbose;
+
+            undef $data->{'state'}; # we dont know the current state, so make sure it wont be overwritten
+
             # set an event for all services
             for my $service_description (keys %{$self->{'service_data'}->{$data->{'host_name'}}}) {
                 &_set_service_event($self, $data->{'host_name'}, $service_description, $result, { 'start' => $data->{'start'}, 'end' => $data->{'end'}, 'time' => $data->{'time'} });
             }
-
-            undef $data->{'state'}; # we dont know the current state, so make sure it wont be overwritten
 
             # set the host event itself
             &_set_host_event($self,$data->{'host_name'}, $result, $data);
@@ -1075,7 +1076,7 @@ sub _process_log_line {
                 $host_hist->{'in_downtime'} = 1;
             }
             else {
-                $start = "STOP";
+                $start = "END";
                 $plugin_output = 'End of scheduled downtime';
                 $host_hist->{'in_downtime'} = 0;
             }
@@ -1153,27 +1154,27 @@ sub _set_service_event {
 
             # ok
             elsif($service_hist->{'last_state'} == STATE_OK) {
-                $self->_add_time($service_data, $data->{'time'}, 'time_ok', $diff, ($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}));
+                $self->_add_time($service_data, $data->{'time'}, 'time_ok', $diff, ($service_hist->{'in_downtime'} || $host_hist->{'in_downtime'}));
             }
 
             # warning
             elsif($service_hist->{'last_state'} == STATE_WARNING) {
-                $self->_add_time($service_data, $data->{'time'}, 'time_warning', $diff, ($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}));
+                $self->_add_time($service_data, $data->{'time'}, 'time_warning', $diff, ($service_hist->{'in_downtime'} || $host_hist->{'in_downtime'}));
             }
 
             # critical
             elsif($service_hist->{'last_state'} == STATE_CRITICAL) {
-                $self->_add_time($service_data, $data->{'time'}, 'time_critical', $diff, ($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}));
+                $self->_add_time($service_data, $data->{'time'}, 'time_critical', $diff, ($service_hist->{'in_downtime'} || $host_hist->{'in_downtime'}));
             }
 
             # unknown
             elsif($service_hist->{'last_state'} == STATE_UNKNOWN) {
-                $self->_add_time($service_data, $data->{'time'}, 'time_unknown', $diff, ($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}));
+                $self->_add_time($service_data, $data->{'time'}, 'time_unknown', $diff, ($service_hist->{'in_downtime'} || $host_hist->{'in_downtime'}));
             }
 
             # no data yet
             elsif($service_hist->{'last_state'} == STATE_UNSPECIFIED) {
-                $self->_add_time($service_data, $data->{'time'}, 'time_indeterminate_nodata', $diff, ($service_hist->{'in_downtime'} or $host_hist->{'in_downtime'}), 'scheduled_time_indeterminate');
+                $self->_add_time($service_data, $data->{'time'}, 'time_indeterminate_nodata', $diff, ($service_hist->{'in_downtime'} || $host_hist->{'in_downtime'}), 'scheduled_time_indeterminate');
             }
 
             # not running
@@ -1297,7 +1298,7 @@ sub _log {
 ########################################
 sub _logging_filter {
     my ($hash) = @_;
-    my @keys = keys %{$hash};
+    my @keys = sort keys %{$hash};
     # filter a few keys we don't want to log
     @keys = grep {!/^(state_string_2_int
                       |logger
